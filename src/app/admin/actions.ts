@@ -52,3 +52,13 @@ export async function syncNow(form: FormData) {
   await runSync({ months: monthRange(from, now), trigger: "manual" });
   revalidatePath("/", "layout");
 }
+
+/** Sincroniza UN mes (lo usa la carga de histórico, mes a mes, para no superar el límite de tiempo). */
+export async function syncMonth(month: string): Promise<{ ok: number; failed: { account: string; message: string }[] }> {
+  await guard();
+  if (!mcpConfigured()) throw new Error("Falta configurar WOOWUP_MCP_URL / WOOWUP_MCP_TOKEN");
+  if (!isMonth(month) || month > currentMonth()) throw new Error("Mes inválido");
+  const r = await runSync({ months: [month], trigger: "manual" });
+  revalidatePath("/", "layout");
+  return { ok: r.ok.length, failed: r.failed };
+}

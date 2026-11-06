@@ -2,6 +2,7 @@ import { getAccounts, getGroups, getSyncRuns, isDemo } from "@/lib/data";
 import { mcpConfigured } from "@/lib/woowup/client";
 import { addMonths, currentMonth, monthLabel } from "@/lib/months";
 import { createGroup, deleteGroup, syncNow, updateAccount } from "./actions";
+import { BackfillButton } from "./BackfillButton";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -48,6 +49,15 @@ export default async function AdminPage() {
             <button className="btn" disabled={disabled || !mcp}>Sincronizar</button>
           </div>
         </form>
+      </section>
+
+      <section className="card p-4 text-sm space-y-3">
+        <div className="label">Carga de histórico</div>
+        <p className="text-pd-slate">
+          Trae todos los meses desde el elegido hasta hoy, de a un mes por vez (cada mes es una llamada corta, así no se corta por tiempo).
+          Se usa una vez al poner en marcha la plataforma o si se agregan cuentas nuevas. Mantené la página abierta hasta que termine.
+        </p>
+        <BackfillButton disabled={disabled || !mcp} />
       </section>
 
       <section className="space-y-3">
