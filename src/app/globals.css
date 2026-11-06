@@ -1,0 +1,33 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;800&family=Open+Sans:wght@400;600&family=Source+Code+Pro:wght@400;600&display=swap");
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --pd-navy: #1a2332;
+  --pd-white: #ffffff;
+  --pd-slate: #4a5568;
+  --pd-light: #f7f8fa;
+  --pd-blue: #2563eb;
+  --pd-cyan: #06b6d4;
+  --pd-green: #10b981;
+  --pd-orange: #f59e0b;
+}
+
+body {
+  @apply bg-pd-light text-pd-navy font-sans antialiased;
+}
+
+@layer components {
+  .card { @apply bg-white rounded-card shadow-card border border-pd-line; }
+  .h-display { @apply font-display font-bold tracking-tight; }
+  .num { @apply font-mono tabular-nums; }
+  .btn { @apply inline-flex items-center gap-2 rounded-md bg-pd-blue px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition disabled:opacity-50; }
+  .btn-ghost { @apply inline-flex items-center gap-2 rounded-md border border-pd-line bg-white px-3 py-2 text-sm font-semibold text-pd-navy hover:border-pd-blue hover:text-pd-blue transition; }
+  .field { @apply rounded-md border border-pd-line bg-white px-3 py-2 text-sm text-pd-navy focus:border-pd-blue focus:outline-none focus:ring-2 focus:ring-pd-blue/20; }
+  .label { @apply text-[11px] font-semibold uppercase tracking-wider text-pd-slate; }
+  .tbl th { @apply px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-white bg-pd-navy whitespace-nowrap; }
+  .tbl td { @apply px-3 py-2 text-sm border-b border-pd-line whitespace-nowrap; }
+  .tbl tbody tr:nth-child(even) td { @apply bg-pd-light/60; }
+  .tbl tbody tr:hover td { @apply bg-pd-blue/5; }
+}

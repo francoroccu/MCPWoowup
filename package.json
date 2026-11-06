@@ -1,0 +1,40 @@
+{
+  "name": "patagonia-woowup-metrics",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Plataforma de métricas mensuales de WoowUp por cuenta madre y marca — Patagonia Digital",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "mcp:inspect": "tsx scripts/mcp-inspect.ts",
+    "sync": "tsx scripts/sync.ts",
+    "backfill": "tsx scripts/sync.ts --from 2025-01"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@neondatabase/serverless": "^1.2.0",
+    "drizzle-orm": "^0.45.4",
+    "next": "^15.5.29",
+    "react": "^19.1.10",
+    "react-dom": "^19.1.10",
+    "recharts": "^3.10.1",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "autoprefixer": "^10.4.20",
+    "dotenv": "^16.4.7",
+    "drizzle-kit": "^0.31.11",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.19",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.0"
+  }
+}
