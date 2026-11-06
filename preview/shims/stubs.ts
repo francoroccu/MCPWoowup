@@ -16,6 +16,7 @@ export const createGroup = noop;
 export const deleteGroup = noop;
 export const updateAccount = noop;
 export const syncNow = noop;
+export const setActionStatus = async (..._a: unknown[]) => {};
 
 // drizzle-orm (solo se usa fuera del modo demo)
 const op = (..._args: unknown[]) => undefined;

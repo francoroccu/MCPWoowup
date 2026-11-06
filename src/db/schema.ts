@@ -109,3 +109,19 @@ export const campaignMetrics = pgTable(
   },
   (t) => [primaryKey({ columns: [t.accountSlug, t.month, t.campaignId] })],
 );
+
+/**
+ * Estado de las mejoras sugeridas por los insights. La clave es estable
+ * (regla + sujeto), así una mejora sigue su estado mes a mes.
+ */
+export const actionItems = pgTable(
+  "action_items",
+  {
+    scopeKey: text("scope_key").notNull(), // "a:<slug de cuenta>" o "g:<slug de cuenta madre>"
+    insightId: text("insight_id").notNull(),
+    title: text("title").notNull(),
+    status: text("status").notNull().default("pendiente"), // pendiente | en_curso | hecho | descartado
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.scopeKey, t.insightId] })],
+);

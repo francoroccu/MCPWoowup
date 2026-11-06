@@ -41,6 +41,7 @@ const result = await build({
         b.onResolve({ filter: /^@\/lib\/woowup\/client$/ }, () => ({ path: stubs }));
         b.onResolve({ filter: /^\.\/actions$/ }, (a) => (a.importer.includes(`${"app"}/admin`) ? { path: stubs } : undefined));
         b.onResolve({ filter: /^drizzle-orm$/ }, () => ({ path: stubs }));
+        b.onResolve({ filter: /^@\/app\/acciones\/actions$/ }, () => ({ path: stubs }));
       },
     },
   ],

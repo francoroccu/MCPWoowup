@@ -12,6 +12,7 @@ Los datos se traen del **servidor MCP de WoowUp** y se guardan en Postgres (Neon
 | **Cuenta madre** `/grupos/[slug]` | KPIs del mes (vs mes anterior y año anterior), marcas del mes, campañas de todas las marcas (top/bottom 5 + tabla), últimos 12 meses y aporte por marca |
 | **Marca** `/cuentas/[slug]` | KPIs del mes, campañas (top/bottom 5 + tabla), mix por canal, one-shot vs automatizaciones, últimos 12 meses |
 | **Campaña** `/cuentas/[slug]/campanas/[id]` | Resultado del mes vs promedio de la cuenta (mismo canal y tipo), peso en envíos y revenue; en automatizaciones, historia mes a mes |
+| **Insights y plan de mejoras** (en cuenta madre y marca) | Hallazgos automáticos del mes con Dato / Cálculo / Hipótesis / Acción, y un plan de mejoras ordenado por impacto y esfuerzo con estado (pendiente, en curso, hecho, descartado) |
 | **Administración** `/admin` | Crear cuentas madre, asignar marcas, renombrar/ocultar, sincronizar a demanda, historial de syncs |
 
 Filtros en todas las vistas: **selector desplegable de mes** (con flechas ‹ ›; por defecto el último mes cerrado), canal
@@ -29,6 +30,25 @@ plegada al final de cada vista. La tabla de campañas permite buscar, ordenar po
 
 Fórmulas: Entrega = (envíos − rebotes) / envíos · Open rate = aperturas / entregados · CTR = clics / entregados ·
 CTOR = clics / aperturas · RPE = revenue / envíos · Ticket = revenue / conversiones · % autom. = revenue triggered / revenue total.
+
+## Insights
+
+`src/lib/insights.ts` aplica reglas deterministas al mes elegido (todos los canales y tipos). No usa IA ni inventa causas:
+cada hallazgo separa el **dato** de WoowUp, el **cálculo** aplicado, la **hipótesis** a validar y la **acción** sugerida.
+
+| Área | Qué detecta |
+|---|---|
+| Entregabilidad | Rebote de email ≥ 2% o entrega < 97%; quejas de spam ≥ 0,1% |
+| Revenue | Caídas o subas ≥ 15% vs mes anterior y ≥ 10% vs mismo mes del año pasado |
+| Frecuencia | Fatiga (más envíos one-shot en 3 meses con más bajas o menos RPE); frecuencia menor a 1 por semana |
+| Automatizaciones | Participación en revenue < 30% o ≥ 60%; flujos clave faltantes; flujos que dejaron de disparar (−60% vs su promedio de 3 meses); flujos que perdieron clics |
+| Canales | Canales con RPE ≥ 3× email y poco uso; canales habilitados sin envíos |
+| Engagement | CTR en baja, distinguiendo apertura vs contenido por el CTOR |
+| Campañas | Concentración del revenue en una pieza; one-shot masivas con CTR < 50% del promedio |
+| Marcas | Marcas con CTR 25% o más por debajo del grupo |
+
+Los umbrales están en ese archivo y se ajustan ahí. El estado del plan de mejoras se guarda en la tabla `action_items`
+con una clave estable por regla y sujeto, así una mejora conserva su estado de un mes a otro.
 
 ## Modo demo
 
@@ -93,7 +113,8 @@ Con muchas cuentas conviene plan Pro (funciones de hasta 300 s); `SYNC_CONCURREN
 src/
   app/                 páginas (portafolio, grupos, cuentas, admin, login) y /api/cron/sync
   components/          KPIs, gráficos (Recharts), tablas, filtros
-  db/schema.ts         account_groups · accounts · monthly_metrics · campaign_metrics · sync_runs
+  db/schema.ts         account_groups · accounts · monthly_metrics · campaign_metrics · action_items · sync_runs
+  lib/insights.ts      reglas de insights y plan de mejoras
   lib/metrics.ts       fórmulas, semáforos y formato
   lib/views.ts         series mensuales, períodos de comparación
   lib/woowup/          cliente MCP, mapping (único punto a ajustar) y sync

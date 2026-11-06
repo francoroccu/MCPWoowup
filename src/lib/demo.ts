@@ -4,7 +4,7 @@
  */
 import type { Account, CampaignRow, Group } from "./types";
 import type { Channel, GroupType, MetricRow } from "./metrics";
-import { currentMonth, monthRange } from "./months";
+import { addMonths, currentMonth, monthRange } from "./months";
 
 export const DEMO_GROUPS: Group[] = [
   { slug: "comercial-depor", name: "Comercial Depor" },
@@ -91,6 +91,7 @@ export function demoRows(): MetricRow[] {
           });
         }
       }
+      applyScenario(a.slug, month, perChannel);
       rows.push(...perChannel);
       // Agregados: (canal, all), (all, tipo), (all, all)
       const agg = (filter: (x: MetricRow) => boolean, channel: Channel, groupType: GroupType) => {
@@ -112,6 +113,37 @@ export function demoRows(): MetricRow[] {
     }
   }
   return rows;
+}
+
+/**
+ * Escenarios ficticios para que la vista previa muestre insights variados.
+ * Referidos al último mes cerrado (L) para que siempre sean visibles.
+ */
+function applyScenario(slug: string, month: string, rows: MetricRow[]) {
+  const L = addMonths(currentMonth(), -1);
+  const ago = [0, 1, 2].find((d) => addMonths(L, -d) === month);
+  // Moda Perú: problema de entregabilidad en email el último mes
+  if (slug === "demo-peru-moda" && month === L) {
+    for (const r of rows.filter((x) => x.channel === "email")) {
+      r.bounces = Math.round(r.sent * 0.034);
+      r.delivered = r.sent - r.bounces;
+      r.spam = Math.round(r.delivered * 0.0021);
+      r.clicks = Math.round(r.clicks * 0.8);
+      r.opens = Math.round(r.opens * 0.85);
+    }
+  }
+  // Retail Argentina: sube la presión one-shot 3 meses seguidos sin más ventas → fatiga
+  if (slug === "demo-argentina" && ago !== undefined) {
+    const k = [1.7, 1.45, 1.25][ago];
+    for (const r of rows.filter((x) => x.groupType === "custom")) {
+      r.sent = Math.round(r.sent * k);
+      r.bounces = Math.round(r.bounces * k);
+      r.delivered = r.sent - r.bounces;
+      r.opens = Math.round(r.opens * (1 + (k - 1) * 0.5));
+      r.unsubscribes = Math.round(r.unsubscribes * k * [2.3, 1.7, 1.3][ago]);
+      r.campaigns = Math.round(r.campaigns * k);
+    }
+  }
 }
 
 // ── Campañas demo ────────────────────────────────────────────────────
@@ -168,7 +200,9 @@ export function demoCampaigns(): CampaignRow[] {
     const lastDay = row.month === currentMonth() ? Math.max(1, today.getDate()) : new Date(y, m, 0).getDate();
     let defs: { id: string; name: string; type: string; sentAt: string | null }[];
     if (row.groupType === "triggered") {
-      defs = AUTOMATIONS.filter((a) => a.channels.includes(row.channel)).map((a) => ({
+      defs = AUTOMATIONS.filter(
+        (a) => a.channels.includes(row.channel) && !(row.accountSlug === "depor-outlet" && ["welcome", "abandoned_cart"].includes(a.type)),
+      ).map((a) => ({
         id: `${row.accountSlug}-auto-${row.channel}-${a.type}`, name: `${a.name} · ${CH_NAME[row.channel]}`, type: a.type, sentAt: null,
       }));
       if (defs.length === 0) continue;
@@ -188,7 +222,18 @@ export function demoCampaigns(): CampaignRow[] {
     }
     // pesos: volumen base y "rendimiento" distinto por campaña
     const wSent = defs.map((_, i) => (row.groupType === "custom" && i < 2 ? 1.8 : 0.4) + r());
-    const perf = defs.map(() => 0.45 + r() * 1.4);
+    // Blockstore: el flujo de carrito abandonado por email casi deja de disparar el último mes cerrado
+    const L = addMonths(currentMonth(), -1);
+    if (row.accountSlug === "blockstore" && row.month === L && row.channel === "email") {
+      defs.forEach((d, i) => {
+        if (d.type === "abandoned_cart") wSent[i] *= 0.12;
+      });
+    }
+    const perf = defs.map((d) => {
+      if (row.groupType !== "triggered") return 0.45 + r() * 1.4;
+      const rs = rng(hash(d.id)); // rendimiento propio y estable del flujo
+      return (0.6 + rs() * 1.0) * (0.9 + r() * 0.2);
+    });
     const perfRev = perf.map((p) => p * (0.6 + r() * 0.9));
     const parts: Record<string, number[]> = {};
     for (const k of COUNT_KEYS) {

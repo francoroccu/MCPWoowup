@@ -93,3 +93,37 @@ export async function getCampaignHistory(accountSlug: string, campaignId: string
   const rows = await db().select().from(c).where(and(eq(c.accountSlug, accountSlug), eq(c.campaignId, campaignId))).orderBy(asc(c.month));
   return rows.map(toCampaign);
 }
+
+/** Todas las combinaciones canal × tipo para un rango (insumo de los insights). */
+export async function getMetricsAll(q: { accountSlugs: string[]; from: string; to: string }): Promise<MetricRow[]> {
+  if (q.accountSlugs.length === 0) return [];
+  if (isDemo()) return demoData().filter((r) => q.accountSlugs.includes(r.accountSlug) && r.month >= q.from && r.month <= q.to);
+  const m = schema.monthlyMetrics;
+  const rows = await db()
+    .select()
+    .from(m)
+    .where(and(inArray(m.accountSlug, q.accountSlugs), gte(m.month, q.from), lte(m.month, q.to)));
+  return rows.map((r) => ({ ...r, channel: r.channel as Channel, groupType: r.groupType as GroupType }));
+}
+
+/** Campañas de un rango de meses (para comparar automatizaciones contra su propia historia). */
+export async function getCampaignsRange(q: { accountSlugs: string[]; from: string; to: string }): Promise<CampaignRow[]> {
+  if (q.accountSlugs.length === 0) return [];
+  if (isDemo()) return demoCampaigns().filter((c) => q.accountSlugs.includes(c.accountSlug) && c.month >= q.from && c.month <= q.to);
+  const c = schema.campaignMetrics;
+  const rows = await db()
+    .select()
+    .from(c)
+    .where(and(inArray(c.accountSlug, q.accountSlugs), gte(c.month, q.from), lte(c.month, q.to)));
+  return rows.map(toCampaign);
+}
+
+export type ActionStatus = "pendiente" | "en_curso" | "hecho" | "descartado";
+
+/** Estado guardado de las mejoras de una cuenta o cuenta madre. */
+export async function getActionStatuses(scopeKey: string): Promise<Record<string, ActionStatus>> {
+  if (isDemo()) return {};
+  const t = schema.actionItems;
+  const rows = await db().select().from(t).where(eq(t.scopeKey, scopeKey));
+  return Object.fromEntries(rows.map((r) => [r.insightId, r.status as ActionStatus]));
+}

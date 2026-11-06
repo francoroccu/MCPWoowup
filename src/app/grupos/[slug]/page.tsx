@@ -13,6 +13,9 @@ import { addMonths, monthLabel } from "@/lib/months";
 import { buildMonthView, commonCurrency, filtersQs, monthTitle, parseFilters } from "@/lib/views";
 import { campaignItems } from "@/lib/campaign-view";
 import { getMetrics } from "@/lib/data";
+import { loadInsights } from "@/lib/insight-view";
+import { InsightsPanel } from "@/components/InsightsPanel";
+import { ActionPlan } from "@/components/ActionPlan";
 
 export const dynamic = "force-dynamic";
 
@@ -33,12 +36,13 @@ export default async function GroupPage({
   const sameCurrency = currency !== "MIXED";
   const qs = filtersQs(f);
   const channels = [...new Set(accounts.flatMap((a) => a.channels))];
-  const [v, campaigns, histRows] = await Promise.all([
+  const [v, campaigns, histRows, ins] = await Promise.all([
     buildMonthView(accounts, f),
     campaignItems(accounts, f.month, qs),
     getMetrics({
       accountSlugs: accounts.map((a) => a.slug), from: addMonths(f.month, -11), to: f.month, channel: f.channel, groupType: f.groupType,
     }),
+    loadInsights("group", group.slug, accounts, f.month, qs),
   ]);
   const hasRevenue = sameCurrency && v.current.revenue != null;
 
@@ -73,6 +77,8 @@ export default async function GroupPage({
       ) : (
         <>
           <KpiCards current={v.current} prev={v.prev} yoy={v.yoy} currency={currency} showLights={f.channel === "email"} partial={v.partial} />
+          <InsightsPanel insights={ins.insights} monthName={monthTitle(f.month)} />
+          <ActionPlan insights={ins.insights} scopeKey={ins.scopeKey} initial={ins.statuses} persist={ins.persist} />
 
           <section className="space-y-2">
             <h2 className="h-display text-lg">Marcas de {group.name} en {monthTitle(f.month)}</h2>

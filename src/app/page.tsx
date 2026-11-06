@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { getMetrics, getTree } from "@/lib/data";
+import { getCampaignsRange, getMetrics, getMetricsAll, getTree } from "@/lib/data";
+import { buildInsights, insightCounts } from "@/lib/insights";
 import { FiltersBar } from "@/components/FiltersBar";
 import { CHANNEL_LABEL, GROUP_TYPE_LABEL, fmtInt, fmtMoney, fmtPct, kpis, pctChange, sumCounts, type MetricRow } from "@/lib/metrics";
 import { addMonths, currentMonth, monthLabel } from "@/lib/months";
@@ -21,12 +22,28 @@ export default async function Portfolio({ searchParams }: { searchParams: Promis
     accountSlugs: all.map((a) => a.slug), from: yoyM, to: f.month, channel: f.channel, groupType: f.groupType,
   });
   const qs = filtersQs(f);
+  const slugsAll = all.map((a) => a.slug);
+  const [allRows, allCamps] = await Promise.all([
+    getMetricsAll({ accountSlugs: slugsAll, from: yoyM, to: f.month }),
+    getCampaignsRange({ accountSlugs: slugsAll, from: addMonths(f.month, -3), to: f.month }),
+  ]);
+  const alerts = (accounts: Account[], scope: "account" | "group") => {
+    const s = accounts.map((a) => a.slug);
+    return insightCounts(
+      buildInsights({
+        scope, month: f.month, accounts, qs, partial,
+        rows: allRows.filter((r) => s.includes(r.accountSlug)),
+        campaigns: allCamps.filter((c) => s.includes(c.accountSlug)),
+      }),
+    );
+  };
 
   const slice = (slugs: string[], month: string) => rows.filter((r: MetricRow) => r.month === month && slugs.includes(r.accountSlug));
   const complete = (slugs: string[], month: string) => slugs.every((s) => rows.some((r) => r.accountSlug === s && r.month === month && r.sent > 0));
 
-  const Row = ({ name, href, accounts, child }: { name: string; href: string; accounts: Account[]; child?: boolean }) => {
+  const Row = ({ name, href, accounts, child, scope = "account" }: { name: string; href: string; accounts: Account[]; child?: boolean; scope?: "account" | "group" }) => {
     const slugs = accounts.map((a) => a.slug);
+    const al = alerts(accounts, scope);
     const c = sumCounts(slice(slugs, f.month));
     const k = kpis(c);
     const cur = commonCurrency(accounts);
@@ -59,6 +76,14 @@ export default async function Portfolio({ searchParams }: { searchParams: Promis
         <D d={cur === "MIXED" ? null : dP} />
         <D d={cur === "MIXED" ? null : dY} />
         <td className="num text-right">{cur === "MIXED" ? "—" : fmtMoney(k.rpe, cur)}</td>
+        <td>
+          <Link href={`${href}?${qs}`} className="flex gap-1" title="Insights del mes: críticos · atención · oportunidades">
+            {al.critical > 0 && <span className="num rounded bg-red-50 px-1.5 text-xs font-bold text-red-700">{al.critical}</span>}
+            {al.warning > 0 && <span className="num rounded bg-amber-50 px-1.5 text-xs font-bold text-amber-800">{al.warning}</span>}
+            {al.opportunity > 0 && <span className="num rounded bg-blue-50 px-1.5 text-xs font-bold text-pd-blue">{al.opportunity}</span>}
+            {al.critical + al.warning + al.opportunity === 0 && <span className="text-xs text-pd-slate/50">—</span>}
+          </Link>
+        </td>
       </tr>
     );
   };
@@ -87,16 +112,17 @@ export default async function Portfolio({ searchParams }: { searchParams: Promis
               <th className="!text-right">vs {monthLabel(prevM)}</th>
               <th className="!text-right">vs {monthLabel(yoyM)} {yoyM.slice(2, 4)}</th>
               <th className="!text-right">RPE</th>
+              <th>Alertas</th>
             </tr>
           </thead>
           <tbody>
             {groups.map((g) => [
-              <Row key={g.slug} name={g.name} href={`/grupos/${g.slug}`} accounts={g.accounts} />,
+              <Row key={g.slug} name={g.name} href={`/grupos/${g.slug}`} accounts={g.accounts} scope="group" />,
               ...g.accounts.map((a) => <Row key={a.slug} name={a.name} href={`/cuentas/${a.slug}`} accounts={[a]} child />),
             ])}
             {standalone.map((a) => <Row key={a.slug} name={a.name} href={`/cuentas/${a.slug}`} accounts={[a]} />)}
             {all.length === 0 && (
-              <tr><td colSpan={11} className="py-10 text-center text-pd-slate">
+              <tr><td colSpan={12} className="py-10 text-center text-pd-slate">
                 Todavía no hay cuentas. Corré la primera sincronización desde <Link href="/admin" className="text-pd-blue underline">Administración</Link>.
               </td></tr>
             )}
@@ -104,6 +130,7 @@ export default async function Portfolio({ searchParams }: { searchParams: Promis
         </table>
       </div>
       <p className="text-xs text-pd-slate">
+        Alertas: insights del mes en <span className="font-semibold text-red-700">rojo</span> críticos, <span className="font-semibold text-amber-800">ámbar</span> atención y <span className="font-semibold text-pd-blue">azul</span> oportunidades.
         Variaciones de revenue vs. el mes anterior y vs. el mismo mes del año pasado; solo se muestran si ese mes tiene datos de todas las marcas.
         {partial && " El mes en curso es parcial y no se compara."} El revenue de una cuenta madre se suma solo si todas sus marcas usan la misma moneda.
       </p>

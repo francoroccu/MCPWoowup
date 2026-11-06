@@ -13,6 +13,9 @@ import {
 import { monthLabel } from "@/lib/months";
 import { buildMonthView, filtersQs, monthTitle, parseFilters } from "@/lib/views";
 import { campaignItems } from "@/lib/campaign-view";
+import { loadInsights } from "@/lib/insight-view";
+import { InsightsPanel } from "@/components/InsightsPanel";
+import { ActionPlan } from "@/components/ActionPlan";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +35,7 @@ export default async function AccountPage({
   const restricted = account.role === "CONSULT" || account.role === "OPERATOR";
 
   const base = { accountSlugs: [slug], from: f.month, to: f.month };
-  const [v, campaigns, byChannel, byType] = await Promise.all([
+  const [v, campaigns, byChannel, byType, ins] = await Promise.all([
     buildMonthView([account], f),
     campaignItems([account], f.month, qs),
     Promise.all(
@@ -45,6 +48,7 @@ export default async function AccountPage({
         key: gt, label: GROUP_TYPE_LABEL[gt], c: sumCounts(await getMetrics({ ...base, channel: f.channel, groupType: gt })),
       })),
     ),
+    loadInsights("account", slug, [account], f.month, qs),
   ]);
 
   const MixTable = ({ title, rows, totalSent }: { title: string; rows: { key: string; label: string; c: Counts }[]; totalSent: number }) => (
@@ -109,6 +113,8 @@ export default async function AccountPage({
       )}
       <FiltersBar f={f} channels={account.channels} />
       <KpiCards current={v.current} prev={v.prev} yoy={v.yoy} currency={account.currency} showLights={f.channel === "email"} partial={v.partial} />
+      <InsightsPanel insights={ins.insights} monthName={monthTitle(f.month)} />
+      <ActionPlan insights={ins.insights} scopeKey={ins.scopeKey} initial={ins.statuses} persist={ins.persist} />
 
       <section className="space-y-3">
         <h2 className="h-display text-lg">Campañas de {monthTitle(f.month)}</h2>
