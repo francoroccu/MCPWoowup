@@ -8,7 +8,7 @@ import { SESSION_COOKIE, authMode, verifySessionValue } from "./auth";
  */
 export async function requireSession() {
   const mode = authMode();
-  if (mode === "open-demo") return; // sin base de datos no hay nada que proteger
+  if (mode === "open" || mode === "open-demo") return; // login desactivado o modo demo
   const ok = mode === "password" && (await verifySessionValue((await cookies()).get(SESSION_COOKIE)?.value));
   if (!ok) throw new Error("No autorizado");
 }

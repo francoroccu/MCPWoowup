@@ -30,8 +30,13 @@ export async function verifySessionValue(value: string | undefined): Promise<boo
   return diff === 0;
 }
 
-/** Sin contraseña configurada solo se permite el modo demo (sin base real). */
-export function authMode(): "password" | "open-demo" | "misconfigured" {
+/**
+ * - AUTH_DISABLED=true → sin login (acceso abierto; la protección queda a cargo de Vercel).
+ * - Con APP_PASSWORD → contraseña compartida del equipo.
+ * - Sin contraseña solo se permite el modo demo (sin base real).
+ */
+export function authMode(): "open" | "password" | "open-demo" | "misconfigured" {
+  if (process.env.AUTH_DISABLED === "true") return "open";
   if (process.env.APP_PASSWORD) return "password";
   return process.env.DATABASE_URL ? "misconfigured" : "open-demo";
 }
