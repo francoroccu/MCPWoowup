@@ -9,16 +9,14 @@ import { readdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 const RAW = "data/raw";
 const COUNTRY = { CHL: ["CL", "CLP"], PER: ["PE", "PEN"], ARG: ["AR", "ARS"], COL: ["CO", "COP"], MEX: ["MX", "MXN"] };
 
-// Perfil tomado de list_accounts / get_account. La moneda se infiere del país:
-// WoowUp informa "USD" en estas cuentas, pero los montos son pesos chilenos.
-const ACCOUNTS = {
-  "coliseum-comercial-depor": { id: 1790, name: "Coliseum [Comercial depor]", country: "CHL", role: 9 },
-  "converse-comercial-depor": { id: 1791, name: "Converse [Comercial depor]", country: "CHL", role: 9 },
-  "steve-madden-comercial-depor": { id: 1792, name: "Steve Madden [Comercial depor]", country: "CHL", role: 9 },
-  "umbro-comercial-depor": { id: 1793, name: "Umbro [Comercial depor]", country: "CHL", role: 9 },
-  "fila-comercial-depor": { id: 1794, name: "Fila [Comercial depor]", country: "CHL", role: 9 },
-  "blockstore-comercial-depor": { id: 1897, name: "Blockstore [Comercial Depor]", country: "CHL", role: 9 },
-};
+// Perfil tomado de list_accounts / get_account (data/raw/accounts.tsv). La moneda se infiere del país:
+// WoowUp informa "USD" en estas cuentas, pero los montos están en moneda local.
+const ACCOUNTS = Object.fromEntries(
+  readFileSync(`${RAW}/accounts.tsv`, "utf8").trim().split("\n").slice(1).map((l) => {
+    const [slug, id, name, country, rol] = l.split("\t");
+    return [slug, { id: Number(id), name, country, role: Number(rol) }];
+  }),
+);
 const ROLE = { 1: "CONSULT", 2: "OPERATOR", 7: "ANALYTICS", 8: "ADMIN", 9: "OWNER" };
 const TYPE = {
   "customer-created": "welcome", "abandoned-cart": "abandoned_cart", "browser-abandonment-product": "browse_abandonment",
@@ -97,10 +95,11 @@ for (const c of campaigns) {
   if (a) a.campaigns++;
 }
 
+const SCOPE = `${accounts.length} cuentas · métricas ene–nov 2026 · detalle de campañas: octubre 2026 en Comercial Depor (top 12 por revenue por marca)`;
 const snapshot = {
   generatedAt: new Date().toISOString(),
   source: "MCP de WoowUp (get_campaigns_stats y list_campaigns, filter_by=activity)",
-  scope: "Piloto Comercial Depor · métricas ene–nov 2026 · campañas de octubre 2026 (top 12 por revenue por marca)",
+  scope: SCOPE,
   campaignMonths: [...new Set(campaigns.map((c) => c.month))],
   groups: [...groups.values()],
   accounts,
