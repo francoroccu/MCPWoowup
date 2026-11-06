@@ -35,6 +35,7 @@ export interface InsightInput {
   campaigns: CampaignRow[]; // meses M-3..M
   partial: boolean;
   qs: string; // query de filtros para los links
+  campaignsComplete?: boolean; // false si solo se cargó una parte de las campañas del mes
 }
 
 const SEV_ORDER: Record<Severity, number> = { critical: 0, warning: 1, opportunity: 2, positive: 3, info: 4 };
@@ -107,14 +108,24 @@ export function buildInsights(inp: InsightInput): Insight[] {
   }
 
   // ── Entregabilidad (email) ────────────────────────────────────────
-  const em = snap(M, "email");
+  // Sin desglose por canal (primera carga) se evalúa el total: en las cuentas relevadas los envíos son de email
+  const noChannelData = !inp.rows.some((r) => r.month === M && r.channel !== "all");
+  const em = noChannelData ? snap(M) : snap(M, "email");
+  const worstBrand = (k: "bounceRate" | "spamRate") => {
+    const ranked = inp.accounts
+      .map((a) => ({ a, s: noChannelData ? snap(M, "all", "all", [a.slug]) : snap(M, "email", "all", [a.slug]) }))
+      .filter((x) => x.s.sent >= 1000)
+      .sort((x, y) => (y.s.k[k] ?? 0) - (x.s.k[k] ?? 0));
+    return ranked[0] ? `principalmente ${ranked[0].a.name} (${fmtPct(ranked[0].s.k[k], 2)})` : undefined;
+  };
   if (em.sent > 0) {
-    const emP = snap(P, "email");
+    const emP = noChannelData ? snap(P) : snap(P, "email");
     const br = em.k.bounceRate ?? 0;
     const sr = em.k.spamRate ?? 0;
     if (br >= 0.02 || (em.k.deliveryRate ?? 1) < 0.97) {
       out.push({
         id: `${prefix}-rebote-email`, severity: br >= 0.03 ? "critical" : "warning", area: "Entregabilidad",
+        brand: inp.scope === "group" ? worstBrand("bounceRate") : undefined,
         title: `Rebote de email en ${fmtPct(br, 2)}`,
         dato: `${fmtInt(em.bounces)} rebotes sobre ${fmtInt(em.sent)} envíos de email (mes anterior: ${fmtPct(emP.k.bounceRate, 2)}).`,
         calculo: "Rebote = rebotes / envíos · referencia orientativa email retail < 2%.",
@@ -126,12 +137,34 @@ export function buildInsights(inp: InsightInput): Insight[] {
     if (sr >= 0.001) {
       out.push({
         id: `${prefix}-spam-email`, severity: sr >= 0.003 ? "critical" : "warning", area: "Entregabilidad",
+        brand: inp.scope === "group" ? worstBrand("spamRate") : undefined,
         title: `Quejas de spam en ${fmtPct(sr, 2)}`,
         dato: `${fmtInt(em.spam)} reportes de spam sobre ${fmtInt(em.delivered)} emails entregados.`,
         calculo: "Spam = reportes / entregados · referencia orientativa < 0,1% (Gmail y Yahoo exigen < 0,3%).",
         hipotesis: "Suele asociarse a envíos a segmentos que no esperan el mensaje o a frecuencia alta.",
         accion: "Revisar el origen de los segmentos del último mes, hacer visible el link de baja y bajar la frecuencia a inactivos.",
         impacto: "Alto", esfuerzo: "Medio",
+      });
+    }
+  }
+
+  // En cuentas madre, una marca con problemas de entregabilidad queda diluida en el total: se evalúa por marca
+  if (inp.scope === "group" && inp.accounts.length > 1) {
+    for (const a of inp.accounts) {
+      const s = noChannelData ? snap(M, "all", "all", [a.slug]) : snap(M, "email", "all", [a.slug]);
+      if (s.sent < 10000) continue;
+      const b = s.k.bounceRate ?? 0;
+      const sp = s.k.spamRate ?? 0;
+      if (b < 0.02 && sp < 0.001) continue;
+      out.push({
+        id: `g-entregabilidad-${a.slug}`, severity: b >= 0.03 || sp >= 0.003 ? "critical" : "warning", area: "Entregabilidad", brand: a.name,
+        title: `${a.name}: ${b >= 0.02 ? `rebote ${fmtPct(b, 2)}` : ""}${b >= 0.02 && sp >= 0.001 ? " y " : ""}${sp >= 0.001 ? `quejas de spam ${fmtPct(sp, 2)}` : ""}`,
+        dato: `${fmtInt(s.bounces)} rebotes y ${fmtInt(s.spam)} reportes de spam sobre ${fmtInt(s.sent)} envíos de email.`,
+        calculo: "Rebote = rebotes / envíos (ref. < 2%) · Spam = reportes / entregados (ref. < 0,1%; Gmail y Yahoo exigen < 0,3%).",
+        hipotesis: "Suele venir de un envío a una base fría o importada sin validar. Si comparten dominio de envío, afecta la entrega de las otras marcas.",
+        accion: `Identificar en ${a.name} la campaña que concentra los rebotes y quejas, excluir inactivos y hard bounces, y validar la base antes del próximo envío masivo.`,
+        impacto: "Alto", esfuerzo: "Bajo",
+        link: { label: `Ver ${a.name}`, href: `/cuentas/${a.slug}?${inp.qs}` },
       });
     }
   }
@@ -245,7 +278,7 @@ export function buildInsights(inp: InsightInput): Insight[] {
       const autos = campM.filter((c) => c.accountSlug === a.slug && c.groupType === "triggered");
       const types = new Set(autos.map((c) => c.campaignType));
       const missing = CORE_FLOWS.filter((f) => !types.has(f.type));
-      if (missing.length) {
+      if (missing.length && inp.campaignsComplete !== false) {
         const top = missing.filter((f) => f.impacto !== "Bajo");
         if (top.length) {
           out.push({
@@ -377,7 +410,7 @@ export function buildInsights(inp: InsightInput): Insight[] {
     const oneShots = campM.filter((c) => c.groupType === "custom" && c.sent >= 5000);
     const avgCtr = cur.k.ctr ?? 0;
     const weak = oneShots.filter((c) => (kpis(c).ctr ?? 0) < avgCtr * 0.5);
-    if (weak.length >= 2) {
+    if (weak.length >= 2 && inp.campaignsComplete !== false) {
       const sentWeak = weak.reduce((t, c) => t + c.sent, 0);
       out.push({
         id: `${prefix}-campanas-debiles`, severity: "warning", area: "Campañas",

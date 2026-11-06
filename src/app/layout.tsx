@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
-import { isDemo } from "@/lib/data";
+import { dataMode, snapshotInfo } from "@/lib/data";
 import { authMode } from "@/lib/auth";
 import { logout } from "./login/actions";
 
@@ -11,7 +11,8 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const demo = isDemo();
+  const mode = dataMode();
+  const snap = snapshotInfo();
   const withAuth = authMode() === "password";
   return (
     <html lang="es">
@@ -27,9 +28,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/admin" className="hover:text-white">Administración</Link>
             </nav>
             <div className="ml-auto flex items-center gap-3">
-              {demo && (
+              {mode === "demo" && (
                 <span className="rounded-full bg-pd-orange px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-pd-navy">
                   Modo demo · datos ficticios
+                </span>
+              )}
+              {mode === "snapshot" && snap && (
+                <span
+                  title={snap.scope ?? undefined}
+                  className="rounded-full bg-pd-green px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-pd-navy"
+                >
+                  Datos reales WoowUp · carga del{" "}
+                  {snap.generatedAt ? new Date(snap.generatedAt).toLocaleDateString("es-AR", { timeZone: "America/Argentina/Cordoba" }) : "—"}
                 </span>
               )}
               {withAuth && (

@@ -41,7 +41,7 @@ async function main() {
     const stats = await s.call(TOOLS.stats, args);
     save(`stats_${slug}`, stats);
     console.log("interpretado:", parseStats(stats));
-    const camps = await s.call(TOOLS.listCampaigns, listCampaignsArgs({ from, to, page: 1 }));
+    const camps = await s.call(TOOLS.listCampaigns, listCampaignsArgs({ from, to, page: 0 }));
     save(`list_campaigns_${slug}`, camps);
     const pc = parseCampaignList(camps);
     console.log(`\nlist_campaigns → ${pc.items.length} campañas (hasMore: ${pc.hasMore}). Primeras 3:`);

@@ -46,7 +46,7 @@ export function ActionPlan({
           <h2 className="h-display text-lg">Plan de mejoras</h2>
           <p className="text-xs text-pd-slate mt-0.5">
             Acciones sugeridas por los insights, ordenadas por impacto y esfuerzo. {done} de {items.length} hechas.
-            {!persist && " En la vista previa el estado no se guarda."}
+            {!persist && " El estado se guarda cuando la plataforma tenga la base de datos conectada; por ahora vale solo para esta sesión."}
           </p>
         </div>
         <label className="flex items-center gap-2 text-xs font-semibold text-pd-slate">

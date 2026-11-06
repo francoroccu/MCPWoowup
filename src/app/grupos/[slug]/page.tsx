@@ -8,6 +8,7 @@ import { BrandStackChart, TrendChart, type StackPoint } from "@/components/Chart
 import { Badge, PageHeader } from "@/components/PageHeader";
 import { CampaignHighlights } from "@/components/CampaignHighlights";
 import { CampaignsTable } from "@/components/CampaignsTable";
+import { CampaignScopeNote } from "@/components/CampaignScopeNote";
 import { CHANNEL_LABEL, GROUP_TYPE_LABEL, fmtInt, fmtMoney, fmtPct } from "@/lib/metrics";
 import { addMonths, monthLabel } from "@/lib/months";
 import { buildMonthView, commonCurrency, filtersQs, monthTitle, parseFilters } from "@/lib/views";
@@ -124,6 +125,7 @@ export default async function GroupPage({
 
           <section className="space-y-3">
             <h2 className="h-display text-lg">Campañas de {monthTitle(f.month)}</h2>
+            <CampaignScopeNote count={campaigns.length} />
             <CampaignHighlights items={campaigns} byRevenue={hasRevenue} monthName={monthTitle(f.month)} />
             <CampaignsTable
               items={campaigns} showBrand showRevenue={sameCurrency}

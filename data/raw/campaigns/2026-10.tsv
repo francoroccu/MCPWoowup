@@ -1,0 +1,69 @@
+account	id	name	channel	type	sent_at	sent	bounce	open	clicked	spam	unsubscribe	revenue	tickets
+coliseum-comercial-depor	356287	Bienvenida 20%OFF - Campaña de leads	email	customer-created		1757	20	1552	59	0	22	5459198	119
+coliseum-comercial-depor	336618	Bienvenida 20%OFF - Prueba 1	email	customer-created		3147	234	2525	41	0	29	724952	25
+coliseum-comercial-depor	336621	Bienvenida 20%OFF - Prueba 2°Disparo	email	customer-created		2959	0	959	58	0	26	447698	10
+coliseum-comercial-depor	365508	Carrito abandonado 1° Disparo -20%OFF	email	abandoned-cart		133	0	65	11	0	2	236272	5
+coliseum-comercial-depor	409322	Cyber Coliseum - 01-10-26	email	custom	2026-10-01	23141	20	18135	489	0	28	175940	4
+coliseum-comercial-depor	409887	Cyber Coliseum - 05-10-26	email	custom	2026-10-05	11893	5	5438	409	0	58	103962	4
+coliseum-comercial-depor	350573	Winback - 1 - 60 días - Lo nuevo mujer	email	risky-customers		34	1	4	0	0	0	0	0
+coliseum-comercial-depor	351326	Winback - 1 - 60 días - Lo nuevo Hombre	email	risky-customers		20	0	1	0	0	0	0	0
+coliseum-comercial-depor	353085	Remarketing - 1	email	browser-abandonment-product		25	0	19	3	0	0	0	0
+coliseum-comercial-depor	365512	Carrito abandonado 2° Disparo -20%	email	abandoned-cart		127	0	52	7	0	1	0	0
+blockstore-comercial-depor	409761	Cyber -Ropa -02-10-26	email	custom	2026-10-04	16419	33	14445	18	0	4	6189624	129
+blockstore-comercial-depor	409759	Cyber -Los elegidos-04-10-26	email	custom	2026-10-06	32921	39	23367	98	1	9	3752431	81
+blockstore-comercial-depor	409746	Cyber -Especial Adidas-03-10-26	email	custom	2026-10-03	9220	45	7591	50	1	0	2290912	47
+blockstore-comercial-depor	409593	Cyber -Especial Converse-02-10-26	email	custom	2026-10-02	9855	52	8398	59	0	1	2067312	46
+blockstore-comercial-depor	409599	Cyber -Especial DC-02-10-26	email	custom	2026-10-02	1131	4	837	10	0	0	595661	14
+blockstore-comercial-depor	409243	Cyber - Comenzo-01-10-26	email	custom	2026-10-01	4626	12	312	51	0	0	525374	11
+blockstore-comercial-depor	410059	Cyber -Especial New Balance-05-10-26	email	custom	2026-10-05	3527	4	2192	8	0	1	447929	6
+blockstore-comercial-depor	409907	Cyber - Comenzo-05-10-26	email	custom	2026-10-05	12978	80	514	34	0	12	115473	3
+blockstore-comercial-depor	410144	Carrito abandonado nocturno -05-10-26	email	custom	2026-10-06	750	3	24	2	0	1	0	0
+blockstore-comercial-depor	410476	Cupón Extra 10%OFF - 06-10-26	email	custom	2026-10-07	3	0	0	0	0	0	0	0
+blockstore-comercial-depor	410605	more amor llegó a Block 28-10-26	email	custom	2026-10-28	23629	2437	3045	683	231	126	0	0
+converse-comercial-depor	409992	Cyber Cupón 05-10-26	email	custom	2026-10-05	80576	0	51346	1067	5	434	5930099	108
+converse-comercial-depor	409247	Ya comenzó 01-10-26	email	custom	2026-10-01	202887	100	57659	2736	6	917	5908707	105
+converse-comercial-depor	410608	Cyber Cupón adicional 07-10-26	email	custom	2026-10-07	104569	0	53133	907	2	548	5125049	75
+converse-comercial-depor	409884	Ya comenzó 05-10-26	email	custom	2026-10-05	152822	10	14891	2191	4	641	4930978	84
+converse-comercial-depor	409643	BOMBA 2: Ediciones Limitadas 03-10-26	email	custom	2026-10-03	52528	3	45638	1244	0	257	4354797	68
+converse-comercial-depor	410318	CYBER - Abrieron y no compraron 06-10-26	email	custom	2026-10-06	67098	0	50131	892	6	359	3844836	66
+converse-comercial-depor	410876	Extensión Cyber 08-10-26	email	custom	2026-10-08	104648	1	54339	1234	3	516	2700432	43
+converse-comercial-depor	409994	Últimas horas - Cyber Cupón 05-10-26	email	custom	2026-10-06	56372	2	30673	451	0	281	2492898	48
+converse-comercial-depor	410261	Cyber (llamados) 06-10-26	email	custom	2026-10-06	60948	1	20379	726	1	351	2347929	42
+converse-comercial-depor	340800	Bienvenida 1	email	customer-created		5800	103	1699	167	0	32	1937291	27
+converse-comercial-depor	412158	Pro Leather 2 15-10-26	email	custom	2026-10-16	52797	6	37206	332	2	166	1277345	23
+converse-comercial-depor	332084	Carrito abandonado 1° Disparo	email	abandoned-cart		521	2	199	36	0	1	1086009	12
+steve-madden-comercial-depor	409252	¡NOS ADELANTAMOS! 01-10-26	email	custom	2026-10-01	72170	10	8326	1349	15	36	690354	12
+steve-madden-comercial-depor	409588	FOCO OFFTRACK 04-10-26	email	custom	2026-10-04	13653	2	3708	798	1	0	647903	8
+steve-madden-comercial-depor	365493	Carrito abandonado 1° Disparo - 20%OFF	email	abandoned-cart		327	2	53	18	0	1	340048	6
+steve-madden-comercial-depor	414169	SALE 23-10-26 18:00hs	email	custom	2026-10-23	18396	4	6935	1252	3	26	317144	6
+steve-madden-comercial-depor	410561	FOCO BMAXIMA 07-10-26	email	custom	2026-10-07	10556	0	7416	1197	7	37	285342	6
+steve-madden-comercial-depor	409560	FOCO TANKER 04-10-26	email	custom	2026-10-04	22697	1	4313	496	2	11	284940	6
+steve-madden-comercial-depor	413807	Bridal 24-10-26	email	custom	2026-10-24	31217	7	4083	615	0	6	208960	3
+steve-madden-comercial-depor	414142	Ballet - Cutesy 28-10-26	email	custom	2026-10-28	17609	1	3322	298	1	2	201970	3
+steve-madden-comercial-depor	409632	TACOS HASTA 50% 03-10-26	email	custom	2026-10-03	4949	2	615	123	0	3	194960	2
+steve-madden-comercial-depor	410546	FOCO MOMENTOO 07-10-26	email	custom	2026-10-07	13464	0	3469	464	1	13	154970	2
+steve-madden-comercial-depor	409885	¡NOS ADELANTAMOS! 05-10	email	custom	2026-10-05	60348	3	1145	140	7	17	139960	4
+steve-madden-comercial-depor	410558	FOCO VIIIXEN 07-10-26	email	custom	2026-10-08	8957	0	2431	499	0	10	137473	2
+umbro-comercial-depor	388862	PD Bienvenida	email	customer-created		271	2	234	3	0	2	168460	2
+umbro-comercial-depor	410263	CUPON 06-10-26	email	custom	2026-10-06	35711	5	1506	80	2	16	124962	4
+umbro-comercial-depor	409969	Comenzó Cyber! 05-10-26	email	custom	2026-10-05	5298	0	1156	70	0	4	104621	3
+umbro-comercial-depor	409241	Adelanto Cyber 01-10-26	email	custom	2026-10-01	35919	15	1610	177	4	33	45980	1
+umbro-comercial-depor	340062	Carrito 1° disparo	email	abandoned-cart		46	0	1	1	0	0	0	0
+umbro-comercial-depor	340079	Carrito 2° disparo	email	abandoned-cart		16	0	2	0	0	0	0	0
+umbro-comercial-depor	359082	Cumpleaños	email	customer-birthday		231	0	188	5	0	0	0	0
+umbro-comercial-depor	388617	Carrito 3° disparo	email	abandoned-cart		23	0	0	0	0	0	0	0
+umbro-comercial-depor	388860	PD Remarketing 1er disparo	email	browser-abandonment-product		2	0	1	0	0	0	0	0
+umbro-comercial-depor	410147	CUPON 05-10-26	email	custom	2026-10-06	250	0	165	5	0	3	0	0
+umbro-comercial-depor	410742	Cyber Cupón adicional 07-10-26	email	custom	2026-10-07	1623	0	1241	41	1	6	0	0
+fila-comercial-depor	343687	Bienvenida	email	customer-created		2373	30	1973	58	0	18	1562303	32
+fila-comercial-depor	409461	Cyber: FX Court Vintage 02-10-26	email	custom	2026-10-02	6189	0	1232	77	0	22	549577	8
+fila-comercial-depor	365505	Carrito abandonado 2do disparo -20%OFF	email	abandoned-cart		289	0	91	17	0	1	465961	4
+fila-comercial-depor	409253	Cyber: Disruptor II / Wedge 30% OFF 01-10-26	email	custom	2026-10-01	12143	6	1294	119	0	22	416400	8
+fila-comercial-depor	365502	Carrito abandonado 1er disparo -20%OFF	email	abandoned-cart		286	1	100	28	0	1	158461	4
+fila-comercial-depor	410409	Cyber: Disruptor II / Wedge 30% OFF 06-10-26	email	custom	2026-10-06	12105	2	1484	96	0	55	124466	3
+fila-comercial-depor	342512	Carrito abandonado 3er disparo	email	abandoned-cart		272	0	72	17	0	1	118970	2
+fila-comercial-depor	409750	Cyber genérico 04-10-26	email	custom	2026-10-04	6686	0	802	89	0	15	114474	3
+fila-comercial-depor	366834	Cross - Compró general, recomienda accesorios	email	last-purchase		419	0	101	5	0	2	97980	2
+fila-comercial-depor	413590	Carrito abandonado 21-10-26	email	custom	2026-10-21	223	0	54	3	0	0	59990	1
+fila-comercial-depor	413155	New Arrivals 20-10-26	email	custom	2026-10-20	2099	1	985	60	0	9	49990	1
+fila-comercial-depor	410533	Cyber: Queda 1 día 07-10-26	email	custom	2026-10-07	4905	0	533	43	0	20	41990	1

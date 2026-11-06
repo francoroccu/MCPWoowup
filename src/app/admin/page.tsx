@@ -1,4 +1,4 @@
-import { getAccounts, getGroups, getSyncRuns, isDemo } from "@/lib/data";
+import { getAccounts, getGroups, getSyncRuns, isReadOnly } from "@/lib/data";
 import { mcpConfigured } from "@/lib/woowup/client";
 import { addMonths, currentMonth, monthLabel } from "@/lib/months";
 import { createGroup, deleteGroup, syncNow, updateAccount } from "./actions";
@@ -10,7 +10,7 @@ export const maxDuration = 300;
 const Dot = ({ on }: { on: boolean }) => <span className={`inline-block h-2 w-2 rounded-full ${on ? "bg-pd-green" : "bg-pd-red"}`} />;
 
 export default async function AdminPage() {
-  const demo = isDemo();
+  const demo = isReadOnly();
   const [groups, accounts, runs] = await Promise.all([getGroups(), getAccounts({ includeHidden: true }), getSyncRuns()]);
   const mcp = mcpConfigured();
   const now = currentMonth();

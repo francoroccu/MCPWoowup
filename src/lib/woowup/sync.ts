@@ -9,7 +9,7 @@ import { db, schema } from "@/db/client";
 import { monthBounds } from "../months";
 import { WoowUpSession } from "./client";
 import {
-  CAMPAIGNS_PAGE_SIZE, RESTRICTED_ROLES, TOOLS, listCampaignsArgs, parseAccount, parseAccountList, parseCampaignList,
+  CAMPAIGNS_PAGE_SIZE, RESTRICTED_ROLES, TOOLS, listCampaignsArgs, parseAccount, parseAccountList, parseCampaignList, splitAccountName,
   parseStats, statsArgs, switchArgs,
 } from "./mapping";
 
@@ -56,7 +56,7 @@ export async function runSync(opts: SyncOptions): Promise<SyncResult> {
         while (queue.length) {
           const item = queue.shift()!;
           try {
-            await syncAccount(session, item.slug, item.name, opts.months, log);
+            await syncAccount(session, item.slug, item, opts.months, log);
             ok.push(item.slug);
           } catch (e) {
             const message = e instanceof Error ? e.message : String(e);
@@ -80,26 +80,34 @@ export async function runSync(opts: SyncOptions): Promise<SyncResult> {
 }
 
 async function syncAccount(
-  s: WoowUpSession, slug: string, listedName: string, months: string[], log: (m: string) => void,
+  s: WoowUpSession, slug: string, listed: { name: string; role: string | null }, months: string[], log: (m: string) => void,
 ) {
   await s.call(TOOLS.switchAccount, switchArgs(slug));
-  const profile = parseAccount(slug, await s.call(TOOLS.getAccount));
-  if (profile.name === slug && listedName) profile.name = listedName;
+  const profile = parseAccount(slug, await s.call(TOOLS.getAccount), listed);
+  // "Converse [Comercial depor]" → marca Converse dentro de la cuenta madre Comercial Depor
+  const { brand, group } = splitAccountName(profile.name);
+  profile.name = brand;
+  const groupSlug = group ? group.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") : null;
+  if (group && groupSlug) await db().insert(schema.accountGroups).values({ slug: groupSlug, name: group }).onConflictDoNothing();
   const restricted = profile.role ? RESTRICTED_ROLES.includes(profile.role) : false;
 
   const d = db();
   await d
     .insert(schema.accounts)
-    .values({ ...profile, updatedAt: new Date() })
+    .values({ ...profile, groupSlug, updatedAt: new Date() })
     .onConflictDoUpdate({
+      // nombre y cuenta madre no se pisan: pueden haberse editado en Administración
       target: schema.accounts.slug,
       set: {
-        name: profile.name, country: profile.country, currency: profile.currency, timezone: profile.timezone,
-        status: profile.status, role: profile.role, channels: profile.channels, updatedAt: new Date(),
+        country: profile.country, currency: profile.currency, timezone: profile.timezone,
+        status: profile.status, role: profile.role, updatedAt: new Date(),
       },
     });
+  const known = await d.select({ channels: schema.accounts.channels }).from(schema.accounts).where(eq(schema.accounts.slug, slug));
+  profile.channels = known[0]?.channels ?? [];
 
   const combos: { channel: string; groupType: string }[] = [];
+  const seenChannels = new Set<string>(profile.channels);
   for (const channel of ["all", ...profile.channels]) for (const groupType of GROUP_TYPES) combos.push({ channel, groupType });
 
   for (const month of months) {
@@ -123,17 +131,20 @@ async function syncAccount(
           campaigns: sql`excluded.campaigns`, raw: sql`excluded.raw`, syncedAt: sql`excluded.synced_at`,
         },
       });
-    const nCampaigns = await syncCampaigns(s, slug, month, from, to, restricted);
+    const { count: nCampaigns, channels } = await syncCampaigns(s, slug, month, from, to, restricted);
+    channels.forEach((c) => seenChannels.add(c));
     log(`✓ ${slug} ${month} (${combos.length} combinaciones, ${nCampaigns} campañas)`);
   }
+  // canales reales deducidos de las campañas (el campo features de WoowUp no es confiable)
+  await d.update(schema.accounts).set({ channels: [...seenChannels].filter((c) => ["email", "sms", "whatsapp", "push"].includes(c)) }).where(eq(schema.accounts.slug, slug));
 }
 
 /** Reemplaza las campañas del mes de una cuenta con lo que devuelve list_campaigns (paginado). */
 async function syncCampaigns(
   s: WoowUpSession, slug: string, month: string, from: string, to: string, restricted: boolean,
-): Promise<number> {
+): Promise<{ count: number; channels: string[] }> {
   const all = [];
-  for (let page = 1; page <= 30; page++) {
+  for (let page = 0; page < 30; page++) {
     const { items, hasMore } = parseCampaignList(await s.call(TOOLS.listCampaigns, listCampaignsArgs({ from, to, page })), {
       revenueRestricted: restricted,
     });
@@ -152,5 +163,5 @@ async function syncCampaigns(
       })),
     );
   }
-  return unique.length;
+  return { count: unique.length, channels: [...new Set(unique.map((c) => c.channel))] };
 }

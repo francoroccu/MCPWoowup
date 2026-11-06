@@ -1,7 +1,11 @@
 /**
- * ÚNICO lugar donde se asume la forma del MCP de WoowUp.
- * Antes del primer sync real: correr `npm run mcp:inspect` y ajustar aquí
- * los nombres de parámetros y las claves de respuesta si difieren.
+ * ÚNICO lugar donde se interpreta el MCP de WoowUp (mcp.woowup.com/mcp).
+ * Validado contra respuestas reales el 06/11/2026:
+ *  - switch_account({ account_slug })
+ *  - list_accounts → { accounts: [{ id, slug, name, rol }] }  (rol: 1 CONSULT, 2 OPERATOR, 7 ANALYTICS, 8 ADMIN, 9 OWNER)
+ *  - get_account → { title, country (ISO-3), currency (no confiable), features (no confiable) }
+ *  - get_campaigns_stats → { active_account, data: { sent, bounce, open, clicked, spam, unsubscribe, revenue, tickets } }
+ *  - list_campaigns → { data: [{ id, name, type, channel, startdate, stats: {...} }] }, page base 0, limit ≤ 100
  */
 import type { Counts } from "../metrics";
 
@@ -16,7 +20,7 @@ export const TOOLS = {
 
 // ── Argumentos ───────────────────────────────────────────────────────
 export function switchArgs(slug: string) {
-  return { slug };
+  return { account_slug: slug };
 }
 
 /**
@@ -76,11 +80,11 @@ const KEYS = {
   sent: ["sent", "sends", "total_sent", "sent_count", "messages_sent", "envios"],
   delivered: ["delivered", "deliveries", "delivered_count"],
   bounces: ["bounces", "bounced", "bounce", "bounce_count", "total_bounces"],
-  opens: ["unique_opens", "opens", "opened", "open_count"],
+  opens: ["unique_opens", "opens", "open", "opened", "open_count"],
   clicks: ["unique_clicks", "clicks", "clicked", "click_count"],
   spam: ["spam", "spam_reports", "complaints", "spam_count"],
-  unsubscribes: ["unsubscribes", "unsubscribed", "unsubscriptions", "optouts", "opt_outs"],
-  conversions: ["conversions", "orders", "purchases", "transactions", "sales_count"],
+  unsubscribes: ["unsubscribes", "unsubscribe", "unsubscribed", "unsubscriptions", "optouts", "opt_outs"],
+  conversions: ["tickets", "conversions", "orders", "purchases", "transactions", "sales_count"],
   revenue: ["revenue", "attributed_revenue", "total_revenue", "sales_amount", "income"],
   campaigns: ["campaigns", "campaigns_count", "total_campaigns", "campaign_count"],
 };
@@ -120,8 +124,10 @@ export interface ParsedAccount {
 
 const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
 
-/** list_accounts → [{slug, name}] */
-export function parseAccountList(payload: unknown): { slug: string; name: string }[] {
+const ROLES: Record<number, string> = { 1: "CONSULT", 2: "OPERATOR", 7: "ANALYTICS", 8: "ADMIN", 9: "OWNER" };
+
+/** list_accounts → [{slug, name, role}] */
+export function parseAccountList(payload: unknown): { slug: string; name: string; role: string | null }[] {
   const arr = Array.isArray(payload)
     ? payload
     : isObj(payload)
@@ -133,27 +139,44 @@ export function parseAccountList(payload: unknown): { slug: string; name: string
     .map((a) => ({
       slug: str(a.slug) ?? str(a.account_slug) ?? str(a.id) ?? "",
       name: str(a.name) ?? str(a.account_name) ?? str(a.slug) ?? "",
+      role: typeof a.rol === "number" ? (ROLES[a.rol] ?? null) : (str(a.role)?.toUpperCase() ?? null),
     }))
     .filter((a) => a.slug);
 }
 
-/** get_account → perfil normalizado */
-export function parseAccount(slug: string, payload: unknown): ParsedAccount {
+const COUNTRY: Record<string, [string, string]> = {
+  CHL: ["CL", "CLP"], CL: ["CL", "CLP"], PER: ["PE", "PEN"], PE: ["PE", "PEN"], ARG: ["AR", "ARS"], AR: ["AR", "ARS"],
+  COL: ["CO", "COP"], CO: ["CO", "COP"], MEX: ["MX", "MXN"], MX: ["MX", "MXN"], URY: ["UY", "UYU"], UY: ["UY", "UYU"],
+};
+
+/** "Converse [Comercial depor]" → marca "Converse", cuenta madre "Comercial Depor" */
+export function splitAccountName(full: string): { brand: string; group: string | null } {
+  const m = full.match(/^\s*(.*?)\s*\[(.+)\]\s*$/);
+  if (!m) return { brand: full.trim(), group: null };
+  return { brand: m[1].trim(), group: m[2].trim().replace(/\b\w/g, (c) => c.toUpperCase()) };
+}
+
+/** get_account → perfil normalizado. La moneda se infiere del país: WoowUp informa "USD" aunque los montos estén en moneda local. */
+export function parseAccount(slug: string, payload: unknown, listed?: { name?: string; role?: string | null }): ParsedAccount {
   const root = isObj(payload) ? ((isObj(payload.account) ? payload.account : payload) as Obj) : {};
   const chRaw = root.channels ?? root.enabled_channels ?? root.active_channels;
   let channels: string[] = [];
   if (Array.isArray(chRaw)) channels = chRaw.map((c) => (typeof c === "string" ? c : str((c as Obj)?.name) ?? "")).filter(Boolean);
   else if (isObj(chRaw)) channels = Object.entries(chRaw).filter(([, v]) => v === true || (isObj(v) && v.enabled === true)).map(([k]) => k);
   channels = channels.map((c) => c.toLowerCase()).filter((c) => ["email", "sms", "whatsapp", "push"].includes(c));
+  const rawCountry = (str(root.country) ?? str(root.country_code) ?? "").toUpperCase();
+  const [country, currency] = COUNTRY[rawCountry] ?? [rawCountry || null, str(root.currency) ?? str(root.currency_code)];
+  const tz = root.timezone ?? root.time_zone;
   return {
     slug,
-    name: str(root.name) ?? str(root.account_name) ?? slug,
-    country: str(root.country) ?? str(root.country_code),
-    currency: str(root.currency) ?? str(root.currency_code),
-    timezone: str(root.timezone) ?? str(root.time_zone),
+    name: str(root.title) ?? str(root.name) ?? listed?.name ?? slug,
+    country,
+    currency,
+    timezone: typeof tz === "number" ? `UTC${tz >= 0 ? "+" : ""}${tz}` : str(tz),
     status: str(root.status),
-    role: (str(root.role) ?? str(root.user_role))?.toUpperCase() ?? null,
-    channels: channels.length ? channels : ["email"],
+    role: listed?.role ?? (str(root.role) ?? str(root.user_role))?.toUpperCase() ?? null,
+    // features de WoowUp no es confiable (viene todo en false): los canales se deducen de las campañas
+    channels: channels.filter(() => false),
   };
 }
 
@@ -163,6 +186,7 @@ export const RESTRICTED_ROLES = ["CONSULT", "OPERATOR"];
 export const CAMPAIGNS_PAGE_SIZE = 100;
 
 /** list_campaigns con stats del período (filter_by=activity, regla del proyecto). */
+/** page es base 0 en el MCP de WoowUp. */
 export function listCampaignsArgs(p: { from: string; to: string; page: number }) {
   return {
     from_date: p.from,
@@ -173,6 +197,13 @@ export function listCampaignsArgs(p: { from: string; to: string; page: number })
     page: p.page,
   };
 }
+
+/** Tipos de WoowUp → tipos de flujo que usan los insights. */
+const CAMPAIGN_TYPES: Record<string, string> = {
+  "customer-created": "welcome", "abandoned-cart": "abandoned_cart", "browser-abandonment-product": "browse_abandonment",
+  "browser-abandonment": "browse_abandonment", "risky-customers": "winback", "customer-birthday": "birthday",
+  "last-purchase": "post_purchase",
+};
 
 export interface ParsedCampaign extends Counts {
   campaignId: string;
@@ -197,15 +228,17 @@ export function parseCampaignList(
   if (!Array.isArray(arr)) return { items: [], hasMore: false };
   const items = arr.filter(isObj).map((c): ParsedCampaign => {
     const stats = c.stats ?? c.metrics ?? c.summary ?? c;
-    const gt = String(c.group_type ?? c.groupType ?? c.group ?? "").toLowerCase();
-    const sentRaw = str(c.sent_at) ?? str(c.send_date) ?? str(c.scheduled_at) ?? str(c.date) ?? str(c.created_at);
+    const type = String(c.type ?? c.campaign_type ?? "").toLowerCase();
+    const gtRaw = String(c.group_type ?? c.groupType ?? "").toLowerCase();
+    const triggered = gtRaw ? gtRaw.includes("trigger") || gtRaw.includes("auto") : type !== "" && type !== "custom";
+    const sentRaw = triggered ? null : str(c.startdate) ?? str(c.sent_at) ?? str(c.lastsent) ?? str(c.send_date);
     return {
       ...parseStats(stats, opts),
       campaignId: String(c.id ?? c.campaign_id ?? c.uuid ?? ""),
       name: str(c.name) ?? str(c.title) ?? `Campaña ${c.id ?? ""}`,
       channel: (str(c.channel) ?? str(c.channel_type) ?? str(c.media) ?? "email").toLowerCase(),
-      groupType: gt.includes("trigger") || gt.includes("auto") ? "triggered" : "custom",
-      campaignType: str(c.campaign_type) ?? str(c.type),
+      groupType: triggered ? "triggered" : "custom",
+      campaignType: CAMPAIGN_TYPES[type] ?? (type || null),
       status: str(c.status),
       sentAt: sentRaw ? sentRaw.slice(0, 10) : null,
       subject: str(c.subject),

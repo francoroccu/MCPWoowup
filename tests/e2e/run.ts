@@ -47,10 +47,14 @@ async function main() {
 
   // 3) Datos guardados
   const accounts = await getAccounts();
-  check("cuentas guardadas con perfil", accounts.length === 2 && accounts.find((a) => a.slug === "acc-a")?.currency === "CLP");
+  const accA = accounts.find((a) => a.slug === "acc-a");
+  check("moneda inferida del país (WoowUp informa USD)", accA?.currency === "CLP" && accounts.find((a) => a.slug === "acc-b")?.currency === "PEN");
+  check("rol numérico interpretado", accA?.role === "OWNER" && accounts.find((a) => a.slug === "acc-b")?.role === "CONSULT");
+  check("cuenta madre creada desde el nombre \"Marca [Grupo]\"", accA?.name === "Marca A" && accounts.every((a) => a.groupSlug === "grupo-prueba"));
+  check("canales deducidos de las campañas", JSON.stringify([...(accA?.channels ?? [])].sort()) === '["email","whatsapp"]', JSON.stringify(accA?.channels));
   const allRows = await getMetricsAll({ accountSlugs: ["acc-a", "acc-b"], from: months[0], to: M });
-  // acc-a: (all + email + whatsapp) × 3 tipos = 9 · acc-b: (all + email) × 3 = 6 → 15 por mes
-  check("combinaciones canal × tipo por mes", allRows.length === 15 * months.length, `${allRows.length} filas`);
+  // Primer sync: canales aún desconocidos → total, one-shot y automatizaciones = 3 por cuenta y mes
+  check("combinaciones por mes en el primer sync", allRows.length === 6 * months.length, `${allRows.length} filas`);
   const a = (await getMetrics({ accountSlugs: ["acc-a"], from: M, to: M }))[0];
   check("totales de acc-a leídos", !!a && a.sent > 0 && a.delivered === a.sent - a.bounces && a.revenue != null, a ? `sent ${a.sent}, revenue ${a.revenue}` : "");
   const b = (await getMetrics({ accountSlugs: ["acc-b"], from: M, to: M }))[0];
@@ -70,7 +74,10 @@ async function main() {
   const r2 = await runSync({ months: [M], trigger: "cron" });
   const allRows2 = await getMetricsAll({ accountSlugs: ["acc-a", "acc-b"], from: months[0], to: M });
   const camps2 = await getCampaignsRange({ accountSlugs: ["acc-a"], from: M, to: M });
-  check("re-sync sin duplicados", r2.failed.length === 0 && allRows2.length === allRows.length && camps2.length === 130);
+  const keys = allRows2.map((r) => `${r.accountSlug}|${r.month}|${r.channel}|${r.groupType}`);
+  check("re-sync sin duplicados", r2.failed.length === 0 && new Set(keys).size === keys.length && camps2.length === 130);
+  // Segundo sync: ya conoce los canales → cada cuenta (total + email + whatsapp) × 3 tipos = 9
+  check("desglose por canal desde el segundo sync", allRows2.filter((r) => r.month === M).length === 18, `${allRows2.filter((r) => r.month === M).length} filas en ${M}`);
   const runs = await getSyncRuns();
   check("historial de sincronizaciones", runs.length === 2 && runs.every((x) => x.status === "ok"), runs.map((x) => `${x.trigger}:${x.status}`).join(", "));
 
@@ -98,7 +105,8 @@ async function main() {
   // 7) Agrupación y plan de mejoras
   await db().insert(schema.accountGroups).values({ slug: "grupo", name: "Grupo prueba" });
   await db().update(schema.accounts).set({ groupSlug: "grupo" });
-  check("asignación a cuenta madre", (await getAccounts()).every((x) => x.groupSlug === "grupo"));
+  await runSync({ months: [M], trigger: "cron" });
+  check("re-sync no pisa la cuenta madre asignada a mano", (await getAccounts()).every((x) => x.groupSlug === "grupo"));
   await setActionStatus("g:grupo", "g-test", "Mejora de prueba", "en_curso");
   await setActionStatus("g:grupo", "g-test", "Mejora de prueba", "hecho");
   check("estado de mejora guardado y actualizado", (await getActionStatuses("g:grupo"))["g-test"] === "hecho");

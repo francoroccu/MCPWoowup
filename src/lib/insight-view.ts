@@ -1,5 +1,5 @@
 import "server-only";
-import { getActionStatuses, getCampaignsRange, getMetricsAll, isDemo } from "./data";
+import { dataMode, getActionStatuses, getCampaignsRange, getMetricsAll, isReadOnly } from "./data";
 import { buildInsights, type Insight } from "./insights";
 import { addMonths, currentMonth } from "./months";
 import type { Account } from "./types";
@@ -12,6 +12,9 @@ export async function loadInsights(scope: "account" | "group", scopeSlug: string
     getCampaignsRange({ accountSlugs: slugs, from: addMonths(month, -3), to: month }),
     getActionStatuses(`${scope === "group" ? "g" : "a"}:${scopeSlug}`),
   ]);
-  const insights: Insight[] = buildInsights({ scope, month, accounts, rows, campaigns, partial: month === currentMonth(), qs });
-  return { insights, statuses, scopeKey: `${scope === "group" ? "g" : "a"}:${scopeSlug}`, persist: !isDemo() };
+  const insights: Insight[] = buildInsights({
+    scope, month, accounts, rows, campaigns, partial: month === currentMonth(), qs,
+    campaignsComplete: dataMode() !== "snapshot",
+  });
+  return { insights, statuses, scopeKey: `${scope === "group" ? "g" : "a"}:${scopeSlug}`, persist: !isReadOnly() };
 }

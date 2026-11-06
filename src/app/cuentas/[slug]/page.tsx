@@ -7,6 +7,7 @@ import { TrendChart } from "@/components/Charts";
 import { Badge, PageHeader } from "@/components/PageHeader";
 import { CampaignHighlights } from "@/components/CampaignHighlights";
 import { CampaignsTable } from "@/components/CampaignsTable";
+import { CampaignScopeNote } from "@/components/CampaignScopeNote";
 import {
   CHANNEL_LABEL, GROUP_TYPE_LABEL, fmtInt, fmtMoney, fmtPct, kpis, sumCounts, type Channel, type Counts, type GroupType,
 } from "@/lib/metrics";
@@ -118,6 +119,7 @@ export default async function AccountPage({
 
       <section className="space-y-3">
         <h2 className="h-display text-lg">Campañas de {monthTitle(f.month)}</h2>
+            <CampaignScopeNote count={campaigns.length} />
         <CampaignHighlights items={campaigns} byRevenue={!restricted && v.current.revenue != null} monthName={monthTitle(f.month)} />
         <CampaignsTable items={campaigns} showBrand={false} showRevenue initialChannel={f.channel} initialType={f.groupType} />
       </section>

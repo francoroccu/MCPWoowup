@@ -1,7 +1,8 @@
 /**
  * Servidor MCP simulado de WoowUp (Streamable HTTP) para pruebas de punta a punta.
- * Imita el contrato que asume src/lib/woowup/mapping.ts. No valida el contrato
- * real de WoowUp: eso se hace con `npm run mcp:inspect` contra el servidor real.
+ * Reproduce el formato real de mcp.woowup.com relevado el 06/11/2026 (nombres de
+ * parámetros, claves de respuesta, roles numéricos, páginas base 0, moneda "USD"
+ * en cuentas chilenas).
  */
 import { createServer, type Server as HttpServer } from "node:http";
 import { randomUUID } from "node:crypto";
@@ -16,8 +17,8 @@ export interface CallLog {
 }
 
 const ACCOUNTS = {
-  "acc-a": { name: "Marca A", country: "CL", currency: "CLP", role: "ADMIN", channels: ["email", "whatsapp"], campaigns: 130 },
-  "acc-b": { name: "Marca B", country: "PE", currency: "PEN", role: "CONSULT", channels: ["email"], campaigns: 12 },
+  "acc-a": { id: 1, name: "Marca A [Grupo prueba]", country: "CHL", rol: 9, role: "OWNER", campaigns: 130 },
+  "acc-b": { id: 2, name: "Marca B [Grupo prueba]", country: "PER", rol: 1, role: "CONSULT", campaigns: 12 },
 } as const;
 type Slug = keyof typeof ACCOUNTS;
 
@@ -30,14 +31,13 @@ function statsFor(slug: Slug, from: string, channel?: string, groupType?: string
   const sent = Math.round(base);
   return {
     sent,
-    bounces: Math.round(sent * 0.012),
-    unique_opens: Math.round(sent * 0.3),
-    unique_clicks: Math.round(sent * 0.02),
+    bounce: Math.round(sent * 0.012),
+    open: Math.round(sent * 0.3),
+    clicked: Math.round(sent * 0.02),
     spam: Math.round(sent * 0.0003),
-    unsubscribes: Math.round(sent * 0.002),
-    conversions: Math.round(sent * 0.0008),
+    unsubscribe: Math.round(sent * 0.002),
     revenue: ACCOUNTS[slug].role === "CONSULT" ? "REDACTED" : Math.round(sent * 75),
-    campaigns_count: groupType === "triggered" ? 5 : 20,
+    tickets: Math.round(sent * 0.0008),
   };
 }
 
@@ -47,18 +47,18 @@ function campaignsFor(slug: Slug, from: string) {
     const triggered = i < 6;
     const sent = 1000 + i * 37;
     return {
-      id: triggered ? `${slug}-flow-${i}` : `${slug}-${from.slice(0, 7)}-${i}`,
+      id: triggered ? 1000 + i : Number(`${from.slice(2, 4)}${from.slice(5, 7)}${String(i).padStart(3, "0")}`),
       name: triggered ? `Flujo ${i}` : `Campaña ${i}`,
-      channel: i % 5 === 0 ? "whatsapp" : "email",
-      group_type: triggered ? "triggered" : "custom",
-      campaign_type: triggered ? ["abandoned_cart", "welcome", "post_purchase", "winback", "birthday", "browse_abandonment"][i] : "newsletter",
-      status: triggered ? "active" : "sent",
-      sent_at: triggered ? null : `${from.slice(0, 7)}-${String((i % 28) + 1).padStart(2, "0")}T12:00:00Z`,
       subject: `Asunto ${i}`,
+      status: "active",
+      stage: "sent",
+      type: triggered ? ["abandoned-cart", "customer-created", "last-purchase", "risky-customers", "customer-birthday", "browser-abandonment-product"][i] : "custom",
+      lastsent: `${from.slice(0, 7)}-28 10:00:00`,
+      startdate: triggered ? "2026-01-10T12:00:00+00:00" : `${from.slice(0, 7)}-${String((i % 28) + 1).padStart(2, "0")}T12:00:00+00:00`,
+      channel: i % 5 === 0 ? "whatsapp" : "email",
       stats: {
-        sent, bounces: Math.round(sent * 0.01), unique_opens: Math.round(sent * 0.3), unique_clicks: Math.round(sent * 0.025),
-        spam: 0, unsubscribes: Math.round(sent * 0.002), conversions: Math.round(sent * 0.001),
-        revenue: ACCOUNTS[slug].role === "CONSULT" ? "REDACTED" : sent * 80,
+        revenue: ACCOUNTS[slug].role === "CONSULT" ? "REDACTED" : sent * 80, tickets: Math.round(sent * 0.001),
+        sent, bounce: Math.round(sent * 0.01), open: Math.round(sent * 0.3), clicked: Math.round(sent * 0.025), spam: 0, unsubscribe: Math.round(sent * 0.002),
       },
     };
   });
@@ -79,28 +79,28 @@ function buildServer(log: CallLog[]) {
     const err = (msg: string) => ({ isError: true, content: [{ type: "text" as const, text: msg }] });
     switch (name) {
       case "list_accounts":
-        return ok({ accounts: Object.entries(ACCOUNTS).map(([slug, a]) => ({ slug, name: a.name })) });
+        return ok({ current_account: "acc-a", accounts: Object.entries(ACCOUNTS).map(([slug, a]) => ({ id: a.id, slug, name: a.name, rol: a.rol, is_current: false })) });
       case "switch_account": {
-        const slug = args.slug as Slug;
+        const slug = args.account_slug as Slug;
         if (!(slug in ACCOUNTS)) return err(`cuenta desconocida: ${slug}`);
         current = slug;
-        return ok({ ok: true, account: slug });
+        return ok({ switched_to: slug, account_id: ACCOUNTS[slug].id, account_name: ACCOUNTS[slug].name, role: ACCOUNTS[slug].role, message: `Switched to '${ACCOUNTS[slug].name}'` });
       }
       case "get_account": {
         if (!current) return err("sin cuenta seleccionada");
         const a = ACCOUNTS[current];
-        return ok({ account: { slug: current, name: a.name, country: a.country, currency: a.currency, role: a.role, status: "active", timezone: "America/Santiago", channels: a.channels } });
+        return ok({ id: a.id, slug: current, title: a.name, timezone: -3, currency: "USD", country: a.country, status: "active", features: { whatsapp: false, sms: false, email_marketing: false } });
       }
       case "get_campaigns_stats": {
         if (!current) return err("sin cuenta seleccionada");
-        return ok({ totals: statsFor(current, String(args.from_date), args.channel as string, args.group_type as string) });
+        return ok({ active_account: { slug: current }, data: statsFor(current, String(args.from_date), args.channel as string, args.group_type as string) });
       }
       case "list_campaigns": {
         if (!current) return err("sin cuenta seleccionada");
         const all = campaignsFor(current, String(args.from_date));
-        const page = Number(args.page ?? 1);
-        const limit = Number(args.limit ?? 100);
-        return ok({ campaigns: all.slice((page - 1) * limit, page * limit), pagination: { page, total_pages: Math.ceil(all.length / limit) } });
+        const page = Number(args.page ?? 0); // base 0, como el MCP real
+        const limit = Math.min(Number(args.limit ?? 20), 100);
+        return ok({ active_account: { slug: current }, data: all.slice(page * limit, (page + 1) * limit) });
       }
       default:
         return err(`herramienta desconocida: ${name}`);

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getCampaignsRange, getMetrics, getMetricsAll, getSyncRuns, getTree, isDemo } from "@/lib/data";
+import { getCampaignsRange, getMetrics, getMetricsAll, getSyncRuns, getTree, isDemo, dataMode } from "@/lib/data";
 import { buildInsights, insightCounts } from "@/lib/insights";
 import { FiltersBar } from "@/components/FiltersBar";
 import { CHANNEL_LABEL, GROUP_TYPE_LABEL, fmtInt, fmtMoney, fmtPct, kpis, pctChange, sumCounts, type MetricRow } from "@/lib/metrics";
@@ -35,7 +35,7 @@ export default async function Portfolio({ searchParams }: { searchParams: Promis
     const s = accounts.map((a) => a.slug);
     return insightCounts(
       buildInsights({
-        scope, month: f.month, accounts, qs, partial,
+        scope, month: f.month, accounts, qs, partial, campaignsComplete: dataMode() !== "snapshot",
         rows: allRows.filter((r) => s.includes(r.accountSlug)),
         campaigns: allCamps.filter((c) => s.includes(c.accountSlug)),
       }),
@@ -115,7 +115,7 @@ export default async function Portfolio({ searchParams }: { searchParams: Promis
           <Link href="/admin" className="font-semibold underline">Ver en Administración</Link>
         </div>
       )}
-      <FiltersBar f={f} channels={["email", "sms", "whatsapp", "push"]} />
+      <FiltersBar f={f} channels={[...new Set(all.flatMap((a) => a.channels))]} />
 
       <div className="card overflow-x-auto">
         <table className="tbl w-full">
