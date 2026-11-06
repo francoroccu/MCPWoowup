@@ -1,0 +1,23 @@
+# month group_type sent bounce open clicked spam unsubscribe revenue tickets  (fuente: get_campaigns_stats, filter_by=activity)
+2026-01 custom 1907 200 1199 492 0 2 11797 21
+2026-01 triggered 0 0 0 0 0 0 0 0
+2026-02 custom 1760 42 1115 481 0 0 6184 12
+2026-02 triggered 0 0 0 0 0 0 0 0
+2026-03 custom 413 2 149 16 0 1 0 0
+2026-03 triggered 0 0 0 0 0 0 0 0
+2026-04 custom 2133 45 1367 751 0 1 30205 40
+2026-04 triggered 0 0 0 0 0 0 0 0
+2026-05 custom 6313 141 3871 1685 0 1 53756 76
+2026-05 triggered 4 0 2 0 1 0 0 0
+2026-06 custom 0 0 0 0 0 0 0 0
+2026-06 triggered 1 0 0 0 0 0 0 0
+2026-07 custom 383 0 128 29 2 2 2266 5
+2026-07 triggered 21 0 8 4 0 0 0 0
+2026-08 custom 416 1 148 35 0 1 0 0
+2026-08 triggered 11 0 3 0 0 0 0 0
+2026-09 custom 0 0 0 0 0 0 0 0
+2026-09 triggered 27 0 6 0 0 0 838 1
+2026-10 custom 541 3 186 35 0 1 2172 3
+2026-10 triggered 20 0 11 1 0 0 0 0
+2026-11 custom 0 0 0 0 0 0 0 0
+2026-11 triggered 4 0 3 0 0 0 0 0

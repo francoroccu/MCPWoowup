@@ -1,0 +1,14 @@
+# month group_type sent bounce open clicked spam unsubscribe revenue tickets  (fuente: get_campaigns_stats, filter_by=activity)
+# ene–may 2026: sin envíos (la cuenta empieza a operar en junio)
+2026-06 custom 29695 1172 3197 330 82 34 546 2
+2026-06 triggered 20864 1763 1086 92 76 23 79 1
+2026-07 custom 100581 169 24619 1198 11 95 3508 7
+2026-07 triggered 844 5 142 27 1 1 0 0
+2026-08 custom 90765 35 12085 477 1 41 470 5
+2026-08 triggered 881 5 249 34 0 1 795 2
+2026-09 custom 30364 8 1341 199 2 27 2495 5
+2026-09 triggered 713 2 173 22 0 0 168 2
+2026-10 custom 1155 0 932 91 0 5 89 1
+2026-10 triggered 936 8 338 32 3 2 3978 4
+2026-11 custom 16438 22 13582 111 0 1 294 2
+2026-11 triggered 261 0 85 8 0 1 608 2
