@@ -13,7 +13,8 @@
     "db:studio": "drizzle-kit studio",
     "mcp:inspect": "tsx scripts/mcp-inspect.ts",
     "sync": "tsx scripts/sync.ts",
-    "backfill": "tsx scripts/sync.ts --from 2025-01"
+    "backfill": "tsx scripts/sync.ts --from 2025-01",
+    "build:preview": "node preview/build.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
