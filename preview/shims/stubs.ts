@@ -20,4 +20,5 @@ export const setActionStatus = async (..._a: unknown[]) => {};
 
 // drizzle-orm (solo se usa fuera del modo demo)
 const op = (..._args: unknown[]) => undefined;
+export const getTableColumns = () => ({});
 export const and = op, asc = op, desc = op, eq = op, gte = op, inArray = op, lte = op, sql = op;

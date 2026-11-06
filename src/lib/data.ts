@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, gte, inArray, lte } from "drizzle-orm";
 import { db, hasDatabase, schema } from "@/db/client";
 import { DEMO_ACCOUNTS, DEMO_GROUPS, demoCampaigns, demoRows } from "./demo";
 import type { Channel, GroupType, MetricRow } from "./metrics";
@@ -69,7 +69,7 @@ export async function getSyncRuns(limit = 15): Promise<SyncRun[]> {
   return db().select().from(schema.syncRuns).orderBy(desc(schema.syncRuns.id)).limit(limit);
 }
 
-const toCampaign = (r: typeof schema.campaignMetrics.$inferSelect): CampaignRow => ({
+const toCampaign = (r: Omit<typeof schema.campaignMetrics.$inferSelect, "raw">): CampaignRow => ({
   accountSlug: r.accountSlug, month: r.month, campaignId: r.campaignId, name: r.name, channel: r.channel,
   groupType: r.groupType === "triggered" ? "triggered" : "custom", campaignType: r.campaignType, status: r.status,
   sentAt: r.sentAt, subject: r.subject, sent: r.sent, delivered: r.delivered, bounces: r.bounces, opens: r.opens,
@@ -77,12 +77,18 @@ const toCampaign = (r: typeof schema.campaignMetrics.$inferSelect): CampaignRow 
   revenueRedacted: r.revenueRedacted, campaigns: 1,
 });
 
+/** Columnas de campañas sin la respuesta cruda (raw), que solo sirve para auditoría. */
+function campaignCols() {
+  const { raw: _raw, ...cols } = getTableColumns(schema.campaignMetrics);
+  return cols;
+}
+
 /** Campañas con actividad en un mes, para un conjunto de cuentas. */
 export async function getCampaigns(q: { accountSlugs: string[]; month: string }): Promise<CampaignRow[]> {
   if (q.accountSlugs.length === 0) return [];
   if (isDemo()) return demoCampaigns().filter((c) => q.accountSlugs.includes(c.accountSlug) && c.month === q.month);
   const c = schema.campaignMetrics;
-  const rows = await db().select().from(c).where(and(inArray(c.accountSlug, q.accountSlugs), eq(c.month, q.month)));
+  const rows = await db().select(campaignCols()).from(c).where(and(inArray(c.accountSlug, q.accountSlugs), eq(c.month, q.month)));
   return rows.map(toCampaign);
 }
 
@@ -90,7 +96,7 @@ export async function getCampaigns(q: { accountSlugs: string[]; month: string })
 export async function getCampaignHistory(accountSlug: string, campaignId: string): Promise<CampaignRow[]> {
   if (isDemo()) return demoCampaigns().filter((c) => c.accountSlug === accountSlug && c.campaignId === campaignId).sort((a, b) => a.month.localeCompare(b.month));
   const c = schema.campaignMetrics;
-  const rows = await db().select().from(c).where(and(eq(c.accountSlug, accountSlug), eq(c.campaignId, campaignId))).orderBy(asc(c.month));
+  const rows = await db().select(campaignCols()).from(c).where(and(eq(c.accountSlug, accountSlug), eq(c.campaignId, campaignId))).orderBy(asc(c.month));
   return rows.map(toCampaign);
 }
 
@@ -112,7 +118,7 @@ export async function getCampaignsRange(q: { accountSlugs: string[]; from: strin
   if (isDemo()) return demoCampaigns().filter((c) => q.accountSlugs.includes(c.accountSlug) && c.month >= q.from && c.month <= q.to);
   const c = schema.campaignMetrics;
   const rows = await db()
-    .select()
+    .select(campaignCols())
     .from(c)
     .where(and(inArray(c.accountSlug, q.accountSlugs), gte(c.month, q.from), lte(c.month, q.to)));
   return rows.map(toCampaign);

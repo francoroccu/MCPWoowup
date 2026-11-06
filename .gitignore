@@ -9,3 +9,4 @@ next-env.d.ts
 .vercel
 mcp-inspect-output/
 preview/dist/
+tests/e2e/.out/

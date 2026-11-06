@@ -2,11 +2,13 @@
 import { sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db, hasDatabase, schema } from "@/db/client";
+import { requireSession } from "@/lib/session";
 
 const VALID = ["pendiente", "en_curso", "hecho", "descartado"];
 
 /** Guarda el estado de una mejora sugerida. */
 export async function setActionStatus(scopeKey: string, insightId: string, title: string, status: string) {
+  await requireSession();
   if (!hasDatabase() || !VALID.includes(status)) return;
   await db()
     .insert(schema.actionItems)

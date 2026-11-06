@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getCampaignsRange, getMetrics, getMetricsAll, getTree } from "@/lib/data";
+import { getCampaignsRange, getMetrics, getMetricsAll, getSyncRuns, getTree, isDemo } from "@/lib/data";
 import { buildInsights, insightCounts } from "@/lib/insights";
 import { FiltersBar } from "@/components/FiltersBar";
 import { CHANNEL_LABEL, GROUP_TYPE_LABEL, fmtInt, fmtMoney, fmtPct, kpis, pctChange, sumCounts, type MetricRow } from "@/lib/metrics";
@@ -13,7 +13,11 @@ const FLAG: Record<string, string> = { AR: "🇦🇷", CL: "🇨🇱", PE: "🇵
 
 export default async function Portfolio({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const f = parseFilters(await searchParams);
-  const { groups, standalone } = await getTree();
+  const [{ groups, standalone }, runs] = await Promise.all([getTree(), getSyncRuns(10)]);
+  const lastOk = runs.find((r) => r.status === "ok" || r.status === "partial");
+  const lastRun = runs[0];
+  const hoursSince = lastOk?.finishedAt ? (Date.now() - new Date(lastOk.finishedAt).getTime()) / 36e5 : null;
+  const stale = !isDemo() && (hoursSince == null || hoursSince > 36 || lastRun?.status === "error");
   const all = [...groups.flatMap((g) => g.accounts), ...standalone];
   const prevM = addMonths(f.month, -1);
   const yoyM = addMonths(f.month, -12);
@@ -93,8 +97,24 @@ export default async function Portfolio({ searchParams }: { searchParams: Promis
       <div>
         <p className="label">Portafolio</p>
         <h1 className="h-display text-3xl mt-1">Todas las cuentas · {monthTitle(f.month)}</h1>
-        <p className="text-sm text-pd-slate mt-1">{CHANNEL_LABEL[f.channel]} · {GROUP_TYPE_LABEL[f.groupType]}</p>
+        <p className="text-sm text-pd-slate mt-1">
+          {CHANNEL_LABEL[f.channel]} · {GROUP_TYPE_LABEL[f.groupType]}
+          {lastOk?.finishedAt && (
+            <> · Datos al {new Date(lastOk.finishedAt).toLocaleString("es-AR", { timeZone: "America/Argentina/Cordoba", dateStyle: "short", timeStyle: "short" })}</>
+          )}
+        </p>
       </div>
+      {stale && (
+        <div className="rounded-card border border-pd-red/30 bg-red-50 p-3 text-sm text-red-800">
+          <strong>Los datos pueden estar desactualizados.</strong>{" "}
+          {lastRun?.status === "error"
+            ? `La última sincronización falló: ${lastRun.errors[0]?.message ?? "sin detalle"}.`
+            : hoursSince == null
+              ? "Todavía no hubo una sincronización exitosa."
+              : `La última sincronización exitosa fue hace ${Math.round(hoursSince)} horas.`}{" "}
+          <Link href="/admin" className="font-semibold underline">Ver en Administración</Link>
+        </div>
+      )}
       <FiltersBar f={f} channels={["email", "sms", "whatsapp", "push"]} />
 
       <div className="card overflow-x-auto">

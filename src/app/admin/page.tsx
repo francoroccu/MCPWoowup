@@ -33,13 +33,13 @@ export default async function AdminPage() {
           <div className="label">Sincronizar ahora</div>
           <p className="text-pd-slate">
             Trae de WoowUp los meses elegidos para todas las cuentas y actualiza la base. El cron diario ya re-sincroniza el mes en curso y el anterior.
-            Para el histórico completo desde enero conviene correr <code className="num">npm run backfill</code> desde una terminal (evita el límite de tiempo de Vercel).
+            Desde la web se pueden traer hasta 3 meses; para el histórico completo hay que correr <code className="num">npm run backfill</code> desde una terminal (evita el límite de tiempo de Vercel).
           </p>
           <div className="flex flex-wrap items-end gap-2">
             <label className="flex flex-col gap-1">
               <span className="label">Desde</span>
               <select name="from" className="field" defaultValue={addMonths(now, -1)}>
-                {[0, 1, 2, 3, 5, 11].map((d) => {
+                {[0, 1, 2].map((d) => {
                   const m = addMonths(now, -d);
                   return <option key={m} value={m}>{monthLabel(m)} {m.slice(0, 4)}</option>;
                 })}
