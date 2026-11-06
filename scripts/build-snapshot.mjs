@@ -21,6 +21,8 @@ const ROLE = { 1: "CONSULT", 2: "OPERATOR", 7: "ANALYTICS", 8: "ADMIN", 9: "OWNE
 const TYPE = {
   "customer-created": "welcome", "abandoned-cart": "abandoned_cart", "browser-abandonment-product": "browse_abandonment",
   "risky-customers": "winback", "customer-birthday": "birthday", "last-purchase": "post_purchase",
+  "lost-customers": "winback", "browser-abandonment-category": "browse_abandonment",
+  "browser-abandonment-product-low-price": "price_drop", "first-purchase": "anniversary",
 };
 
 const slugify = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -95,7 +97,7 @@ for (const c of campaigns) {
   if (a) a.campaigns++;
 }
 
-const SCOPE = `${accounts.length} cuentas (todas las de WoowUp) · métricas ene–nov 2026 (nov parcial al 06/11) · detalle de campañas: octubre 2026 en Comercial Depor (top 12 por revenue por marca)`;
+const SCOPE = `${accounts.length} cuentas (todas las de WoowUp) · métricas ene–nov 2026 (nov parcial al 06/11) · detalle de campañas: octubre 2026 en todas las marcas (top 12 por revenue)`;
 const snapshot = {
   generatedAt: new Date().toISOString(),
   source: "MCP de WoowUp (get_campaigns_stats y list_campaigns, filter_by=activity)",

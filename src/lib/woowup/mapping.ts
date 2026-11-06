@@ -203,6 +203,8 @@ const CAMPAIGN_TYPES: Record<string, string> = {
   "customer-created": "welcome", "abandoned-cart": "abandoned_cart", "browser-abandonment-product": "browse_abandonment",
   "browser-abandonment": "browse_abandonment", "risky-customers": "winback", "customer-birthday": "birthday",
   "last-purchase": "post_purchase",
+  "lost-customers": "winback", "browser-abandonment-category": "browse_abandonment",
+  "browser-abandonment-product-low-price": "price_drop", "first-purchase": "anniversary",
 };
 
 export interface ParsedCampaign extends Counts {
