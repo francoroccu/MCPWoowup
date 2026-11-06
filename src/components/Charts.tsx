@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import {
-  Bar, BarChart, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 
 const PALETTE = ["#2563eb", "#06b6d4", "#10b981", "#f59e0b", "#1a2332", "#8b5cf6", "#ec4899", "#64748b"];
@@ -14,12 +14,14 @@ export interface TrendPoint {
   ctr: number | null; // en %
 }
 
-export function TrendChart({ data, showRevenue }: { data: TrendPoint[]; showRevenue: boolean }) {
+export function TrendChart({
+  data, showRevenue, highlight, title = "Últimos 12 meses",
+}: { data: TrendPoint[]; showRevenue: boolean; highlight?: string; title?: string }) {
   const [right, setRight] = useState<"revenue" | "ctr">(showRevenue ? "revenue" : "ctr");
   return (
     <div className="card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="h-display text-sm">Evolución mensual</h3>
+        <h3 className="h-display text-sm">{title}</h3>
         <div className="flex gap-1 text-xs">
           {showRevenue && (
             <button onClick={() => setRight("revenue")} className={`rounded px-2 py-1 font-semibold ${right === "revenue" ? "bg-pd-navy text-white" : "text-pd-slate"}`}>Envíos + revenue</button>
@@ -45,7 +47,11 @@ export function TrendChart({ data, showRevenue }: { data: TrendPoint[]; showReve
               contentStyle={{ borderRadius: 8, border: "1px solid #e3e7ee", fontSize: 12 }}
             />
             <Legend wrapperStyle={{ fontSize: 12 }} />
-            <Bar yAxisId="l" dataKey="sent" name="Envíos" fill="#2563eb" radius={[3, 3, 0, 0]} maxBarSize={36} />
+            <Bar yAxisId="l" dataKey="sent" name="Envíos" fill="#2563eb" radius={[3, 3, 0, 0]} maxBarSize={36}>
+              {data.map((d) => (
+                <Cell key={d.label} fill={!highlight || d.label === highlight ? "#2563eb" : "#bfd0f7"} />
+              ))}
+            </Bar>
             {right === "revenue" ? (
               <Line yAxisId="r" dataKey="revenue" name="Revenue" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3 }} connectNulls />
             ) : (

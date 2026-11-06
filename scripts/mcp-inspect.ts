@@ -8,7 +8,9 @@
 import "dotenv/config";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { WoowUpSession } from "../src/lib/woowup/client";
-import { TOOLS, parseAccount, parseAccountList, parseStats, statsArgs, switchArgs } from "../src/lib/woowup/mapping";
+import {
+  TOOLS, listCampaignsArgs, parseAccount, parseAccountList, parseCampaignList, parseStats, statsArgs, switchArgs,
+} from "../src/lib/woowup/mapping";
 import { addMonths, currentMonth, monthBounds } from "../src/lib/months";
 
 const out = "mcp-inspect-output";
@@ -39,6 +41,11 @@ async function main() {
     const stats = await s.call(TOOLS.stats, args);
     save(`stats_${slug}`, stats);
     console.log("interpretado:", parseStats(stats));
+    const camps = await s.call(TOOLS.listCampaigns, listCampaignsArgs({ from, to, page: 1 }));
+    save(`list_campaigns_${slug}`, camps);
+    const pc = parseCampaignList(camps);
+    console.log(`\nlist_campaigns → ${pc.items.length} campañas (hasMore: ${pc.hasMore}). Primeras 3:`);
+    for (const c of pc.items.slice(0, 3)) console.log(`  • [${c.groupType}/${c.channel}] ${c.name} — envíos ${c.sent}, clics ${c.clicks}, revenue ${c.revenue}`);
   }
   console.log(`\nRespuestas crudas guardadas en ./${out}/`);
   await s.close();

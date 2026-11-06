@@ -6,9 +6,13 @@ import { KpiCards } from "@/components/KpiCards";
 import { MonthlyTable } from "@/components/MonthlyTable";
 import { BrandStackChart, TrendChart, type StackPoint } from "@/components/Charts";
 import { Badge, PageHeader } from "@/components/PageHeader";
-import { CHANNEL_LABEL, GROUP_TYPE_LABEL, fmtInt, fmtMoney, fmtPct, kpis, sumCounts } from "@/lib/metrics";
+import { CampaignHighlights } from "@/components/CampaignHighlights";
+import { CampaignsTable } from "@/components/CampaignsTable";
+import { CHANNEL_LABEL, GROUP_TYPE_LABEL, fmtInt, fmtMoney, fmtPct } from "@/lib/metrics";
 import { addMonths, monthLabel } from "@/lib/months";
-import { buildSeries, commonCurrency, parseFilters } from "@/lib/views";
+import { buildMonthView, commonCurrency, filtersQs, monthTitle, parseFilters } from "@/lib/views";
+import { campaignItems } from "@/lib/campaign-view";
+import { getMetrics } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
@@ -26,36 +30,38 @@ export default async function GroupPage({
 
   const accounts = group.accounts;
   const currency = commonCurrency(accounts);
-  const s = await buildSeries(accounts, f);
-  const channels = [...new Set(accounts.flatMap((a) => a.channels))];
-  const qs = new URLSearchParams({ from: f.from, to: f.to, channel: f.channel, type: f.groupType }).toString();
   const sameCurrency = currency !== "MIXED";
+  const qs = filtersQs(f);
+  const channels = [...new Set(accounts.flatMap((a) => a.channels))];
+  const [v, campaigns, histRows] = await Promise.all([
+    buildMonthView(accounts, f),
+    campaignItems(accounts, f.month, qs),
+    getMetrics({
+      accountSlugs: accounts.map((a) => a.slug), from: addMonths(f.month, -11), to: f.month, channel: f.channel, groupType: f.groupType,
+    }),
+  ]);
+  const hasRevenue = sameCurrency && v.current.revenue != null;
 
   const stack = (metric: "sent" | "clicks" | "revenue"): StackPoint[] =>
-    s.months.map((m) => {
-      const p: StackPoint = { label: monthLabel(m) };
+    v.history.map((h) => {
+      const p: StackPoint = { label: monthLabel(h.month) };
       for (const a of accounts) {
-        const r = (s.byAccount.get(a.slug) ?? []).find((x) => x.month === m);
+        const r = histRows.find((x) => x.accountSlug === a.slug && x.month === h.month);
         p[a.slug] = r ? (r[metric] ?? 0) : 0;
       }
       return p;
     });
 
-  const brandTotals = accounts
-    .map((a) => {
-      const c = sumCounts(s.byAccount.get(a.slug) ?? []);
-      return { a, c, k: kpis(c) };
-    })
-    .sort((x, y) => (y.c.revenue ?? y.c.sent) - (x.c.revenue ?? x.c.sent));
-
-  const prevLabel = `${monthLabel(addMonths(f.from, -s.months.length), true)} – ${monthLabel(addMonths(f.from, -1), true)} (período anterior)`;
+  const brands = accounts
+    .map((a) => ({ a, s: v.byAccount.get(a.slug)! }))
+    .sort((x, y) => (y.s.revenue ?? y.s.sent) - (x.s.revenue ?? x.s.sent));
 
   return (
     <div className="space-y-6">
       <PageHeader
         crumbs={[{ label: "Portafolio", href: `/?${qs}` }, { label: group.name }]}
         title={group.name}
-        subtitle={`Cuenta madre · ${monthLabel(f.from)} ${f.from.slice(0, 4)} → ${monthLabel(f.to)} ${f.to.slice(0, 4)} · ${CHANNEL_LABEL[f.channel]} · ${GROUP_TYPE_LABEL[f.groupType]}`}
+        subtitle={`Cuenta madre · ${monthTitle(f.month)}${v.partial ? " (en curso)" : ""} · ${CHANNEL_LABEL[f.channel]} · ${GROUP_TYPE_LABEL[f.groupType]}`}
         badges={<Badge>{accounts.length} marcas</Badge>}
       />
       <FiltersBar f={f} channels={channels} />
@@ -66,25 +72,10 @@ export default async function GroupPage({
         </div>
       ) : (
         <>
-          <KpiCards total={s.total} prev={s.prevTotal} currency={currency} showLights={f.channel === "email"} prevLabel={prevLabel} />
-
-          <div className="grid lg:grid-cols-2 gap-4">
-            <TrendChart
-              showRevenue={sameCurrency && s.total.revenue != null}
-              data={s.series.map((p) => ({ label: monthLabel(p.month), sent: p.sent, revenue: sameCurrency ? p.revenue : null, ctr: p.k.ctr == null ? null : p.k.ctr * 100 }))}
-            />
-            <BrandStackChart
-              brands={accounts.map((a) => ({ slug: a.slug, name: a.name }))}
-              datasets={[
-                ...(sameCurrency && s.total.revenue != null ? [{ key: "revenue", label: "Revenue", data: stack("revenue") }] : []),
-                { key: "sent", label: "Envíos", data: stack("sent") },
-                { key: "clicks", label: "Clics", data: stack("clicks") },
-              ]}
-            />
-          </div>
+          <KpiCards current={v.current} prev={v.prev} yoy={v.yoy} currency={currency} showLights={f.channel === "email"} partial={v.partial} />
 
           <section className="space-y-2">
-            <h2 className="h-display text-lg">Marcas de {group.name}</h2>
+            <h2 className="h-display text-lg">Marcas de {group.name} en {monthTitle(f.month)}</h2>
             <div className="card overflow-x-auto">
               <table className="tbl w-full">
                 <thead>
@@ -92,6 +83,7 @@ export default async function GroupPage({
                     <th>Marca</th>
                     <th className="!text-right">Envíos</th>
                     <th className="!text-right">% envíos</th>
+                    <th className="!text-right">Campañas</th>
                     <th className="!text-right">Entrega</th>
                     <th className="!text-right">CTR</th>
                     <th className="!text-right">CTOR</th>
@@ -102,22 +94,21 @@ export default async function GroupPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {brandTotals.map(({ a, c, k }) => (
+                  {brands.map(({ a, s }) => (
                     <tr key={a.slug}>
-                      <td className="font-semibold">
-                        <Link href={`/cuentas/${a.slug}?${qs}`} className="hover:text-pd-blue">{a.name} →</Link>
-                      </td>
-                      <td className="num text-right">{fmtInt(c.sent)}</td>
-                      <td className="num text-right">{fmtPct(s.total.sent ? c.sent / s.total.sent : null)}</td>
-                      <td className="num text-right">{fmtPct(k.deliveryRate)}</td>
-                      <td className="num text-right">{fmtPct(k.ctr, 2)}</td>
-                      <td className="num text-right">{fmtPct(k.ctor)}</td>
-                      <td className="num text-right">{fmtPct(k.unsubRate, 2)}</td>
+                      <td className="font-semibold"><Link href={`/cuentas/${a.slug}?${qs}`} className="hover:text-pd-blue">{a.name} →</Link></td>
+                      <td className="num text-right">{fmtInt(s.sent)}</td>
+                      <td className="num text-right">{fmtPct(v.current.sent ? s.sent / v.current.sent : null)}</td>
+                      <td className="num text-right">{fmtInt(s.campaigns)}</td>
+                      <td className="num text-right">{fmtPct(s.k.deliveryRate)}</td>
+                      <td className="num text-right">{fmtPct(s.k.ctr, 2)}</td>
+                      <td className="num text-right">{fmtPct(s.k.ctor)}</td>
+                      <td className="num text-right">{fmtPct(s.k.unsubRate, 2)}</td>
                       <td className="num text-right font-semibold">
-                        {c.revenueRedacted && c.revenue == null ? <span className="text-xs text-pd-orange">sin permisos</span> : fmtMoney(c.revenue, a.currency)}
+                        {s.revenueRedacted && s.revenue == null ? <span className="text-xs text-pd-orange">sin permisos</span> : fmtMoney(s.revenue, a.currency)}
                       </td>
-                      <td className="num text-right">{sameCurrency && s.total.revenue ? fmtPct((c.revenue ?? 0) / s.total.revenue) : "—"}</td>
-                      <td className="num text-right">{fmtMoney(k.rpe, a.currency)}</td>
+                      <td className="num text-right">{hasRevenue && v.current.revenue ? fmtPct((s.revenue ?? 0) / v.current.revenue) : "—"}</td>
+                      <td className="num text-right">{fmtMoney(s.k.rpe, a.currency)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -125,10 +116,37 @@ export default async function GroupPage({
             </div>
           </section>
 
-          <section className="space-y-2">
-            <h2 className="h-display text-lg">Consolidado mes a mes</h2>
-            <MonthlyTable series={s.series} currency={currency} />
+          <section className="space-y-3">
+            <h2 className="h-display text-lg">Campañas de {monthTitle(f.month)}</h2>
+            <CampaignHighlights items={campaigns} byRevenue={hasRevenue} monthName={monthTitle(f.month)} />
+            <CampaignsTable
+              items={campaigns} showBrand showRevenue={sameCurrency}
+              initialChannel={f.channel} initialType={f.groupType}
+            />
           </section>
+
+          <div className="grid lg:grid-cols-2 gap-4">
+            <TrendChart
+              highlight={monthLabel(f.month)}
+              showRevenue={hasRevenue}
+              data={v.history.map((p) => ({ label: monthLabel(p.month), sent: p.sent, revenue: sameCurrency ? p.revenue : null, ctr: p.k.ctr == null ? null : p.k.ctr * 100 }))}
+            />
+            <BrandStackChart
+              brands={accounts.map((a) => ({ slug: a.slug, name: a.name }))}
+              datasets={[
+                ...(hasRevenue ? [{ key: "revenue", label: "Revenue", data: stack("revenue") }] : []),
+                { key: "sent", label: "Envíos", data: stack("sent") },
+                { key: "clicks", label: "Clics", data: stack("clicks") },
+              ]}
+            />
+          </div>
+
+          <details className="group">
+            <summary className="cursor-pointer select-none h-display text-sm text-pd-blue hover:underline">
+              Ver tabla histórica de los últimos 12 meses
+            </summary>
+            <div className="mt-3"><MonthlyTable series={v.history} currency={currency} /></div>
+          </details>
         </>
       )}
     </div>

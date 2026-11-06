@@ -11,6 +11,7 @@ export const TOOLS = {
   switchAccount: "switch_account",
   getAccount: "get_account",
   stats: "get_campaigns_stats",
+  listCampaigns: "list_campaigns",
 } as const;
 
 // ── Argumentos ───────────────────────────────────────────────────────
@@ -157,3 +158,65 @@ export function parseAccount(slug: string, payload: unknown): ParsedAccount {
 }
 
 export const RESTRICTED_ROLES = ["CONSULT", "OPERATOR"];
+
+// ── Campañas ─────────────────────────────────────────────────────────
+export const CAMPAIGNS_PAGE_SIZE = 100;
+
+/** list_campaigns con stats del período (filter_by=activity, regla del proyecto). */
+export function listCampaignsArgs(p: { from: string; to: string; page: number }) {
+  return {
+    from_date: p.from,
+    to_date: p.to,
+    filter_by: "activity",
+    with_stats: true,
+    limit: CAMPAIGNS_PAGE_SIZE,
+    page: p.page,
+  };
+}
+
+export interface ParsedCampaign extends Counts {
+  campaignId: string;
+  name: string;
+  channel: string;
+  groupType: "custom" | "triggered";
+  campaignType: string | null;
+  status: string | null;
+  sentAt: string | null;
+  subject: string | null;
+  raw: unknown;
+}
+
+export function parseCampaignList(
+  payload: unknown,
+  opts: { revenueRestricted?: boolean } = {},
+): { items: ParsedCampaign[]; hasMore: boolean | null } {
+  const root = isObj(payload) ? payload : {};
+  const arr = Array.isArray(payload)
+    ? payload
+    : ((root.campaigns ?? root.data ?? root.items ?? root.results) as unknown[]);
+  if (!Array.isArray(arr)) return { items: [], hasMore: false };
+  const items = arr.filter(isObj).map((c): ParsedCampaign => {
+    const stats = c.stats ?? c.metrics ?? c.summary ?? c;
+    const gt = String(c.group_type ?? c.groupType ?? c.group ?? "").toLowerCase();
+    const sentRaw = str(c.sent_at) ?? str(c.send_date) ?? str(c.scheduled_at) ?? str(c.date) ?? str(c.created_at);
+    return {
+      ...parseStats(stats, opts),
+      campaignId: String(c.id ?? c.campaign_id ?? c.uuid ?? ""),
+      name: str(c.name) ?? str(c.title) ?? `Campaña ${c.id ?? ""}`,
+      channel: (str(c.channel) ?? str(c.channel_type) ?? str(c.media) ?? "email").toLowerCase(),
+      groupType: gt.includes("trigger") || gt.includes("auto") ? "triggered" : "custom",
+      campaignType: str(c.campaign_type) ?? str(c.type),
+      status: str(c.status),
+      sentAt: sentRaw ? sentRaw.slice(0, 10) : null,
+      subject: str(c.subject),
+      raw: c,
+    };
+  }).filter((c) => c.campaignId);
+  const meta = (isObj(root.pagination) ? root.pagination : isObj(root.meta) ? root.meta : root) as Obj;
+  const hasMore =
+    typeof meta.has_more === "boolean" ? meta.has_more
+    : typeof meta.next === "string" || typeof meta.next_page === "number" ? true
+    : typeof meta.total_pages === "number" && typeof meta.page === "number" ? (meta.page as number) < (meta.total_pages as number)
+    : null; // desconocido → se decide por tamaño de página
+  return { items, hasMore };
+}

@@ -1,9 +1,9 @@
 import "server-only";
 import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { db, hasDatabase, schema } from "@/db/client";
-import { DEMO_ACCOUNTS, DEMO_GROUPS, demoRows } from "./demo";
+import { DEMO_ACCOUNTS, DEMO_GROUPS, demoCampaigns, demoRows } from "./demo";
 import type { Channel, GroupType, MetricRow } from "./metrics";
-import type { Account, Group, GroupWithAccounts, SyncRun } from "./types";
+import type { Account, CampaignRow, Group, GroupWithAccounts, SyncRun } from "./types";
 
 export const isDemo = () => !hasDatabase();
 
@@ -67,4 +67,29 @@ export async function getMetrics(q: {
 export async function getSyncRuns(limit = 15): Promise<SyncRun[]> {
   if (isDemo()) return [];
   return db().select().from(schema.syncRuns).orderBy(desc(schema.syncRuns.id)).limit(limit);
+}
+
+const toCampaign = (r: typeof schema.campaignMetrics.$inferSelect): CampaignRow => ({
+  accountSlug: r.accountSlug, month: r.month, campaignId: r.campaignId, name: r.name, channel: r.channel,
+  groupType: r.groupType === "triggered" ? "triggered" : "custom", campaignType: r.campaignType, status: r.status,
+  sentAt: r.sentAt, subject: r.subject, sent: r.sent, delivered: r.delivered, bounces: r.bounces, opens: r.opens,
+  clicks: r.clicks, spam: r.spam, unsubscribes: r.unsubscribes, conversions: r.conversions, revenue: r.revenue,
+  revenueRedacted: r.revenueRedacted, campaigns: 1,
+});
+
+/** Campañas con actividad en un mes, para un conjunto de cuentas. */
+export async function getCampaigns(q: { accountSlugs: string[]; month: string }): Promise<CampaignRow[]> {
+  if (q.accountSlugs.length === 0) return [];
+  if (isDemo()) return demoCampaigns().filter((c) => q.accountSlugs.includes(c.accountSlug) && c.month === q.month);
+  const c = schema.campaignMetrics;
+  const rows = await db().select().from(c).where(and(inArray(c.accountSlug, q.accountSlugs), eq(c.month, q.month)));
+  return rows.map(toCampaign);
+}
+
+/** Historia mensual de una campaña (útil para automatizaciones). */
+export async function getCampaignHistory(accountSlug: string, campaignId: string): Promise<CampaignRow[]> {
+  if (isDemo()) return demoCampaigns().filter((c) => c.accountSlug === accountSlug && c.campaignId === campaignId).sort((a, b) => a.month.localeCompare(b.month));
+  const c = schema.campaignMetrics;
+  const rows = await db().select().from(c).where(and(eq(c.accountSlug, accountSlug), eq(c.campaignId, campaignId))).orderBy(asc(c.month));
+  return rows.map(toCampaign);
 }

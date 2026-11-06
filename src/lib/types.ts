@@ -31,3 +31,27 @@ export interface SyncRun {
   accountsFailed: number;
   errors: { account: string; message: string }[];
 }
+
+export interface CampaignRow {
+  accountSlug: string;
+  month: string;
+  campaignId: string;
+  name: string;
+  channel: string;
+  groupType: "custom" | "triggered";
+  campaignType: string | null;
+  status: string | null;
+  sentAt: string | null;
+  subject: string | null;
+  sent: number;
+  delivered: number;
+  bounces: number;
+  opens: number;
+  clicks: number;
+  spam: number;
+  unsubscribes: number;
+  conversions: number;
+  revenue: number | null;
+  revenueRedacted: boolean;
+  campaigns: number; // siempre 1 (compatibilidad con Counts)
+}

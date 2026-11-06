@@ -4,12 +4,13 @@
  * Combinaciones guardadas por mes: total, cada canal habilitado, one-shot vs
  * automatizaciones, y canal × tipo (para poder filtrar ambas cosas a la vez).
  */
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db/client";
 import { monthBounds } from "../months";
 import { WoowUpSession } from "./client";
 import {
-  RESTRICTED_ROLES, TOOLS, parseAccount, parseAccountList, parseStats, statsArgs, switchArgs,
+  CAMPAIGNS_PAGE_SIZE, RESTRICTED_ROLES, TOOLS, listCampaignsArgs, parseAccount, parseAccountList, parseCampaignList,
+  parseStats, statsArgs, switchArgs,
 } from "./mapping";
 
 export interface SyncOptions {
@@ -122,6 +123,34 @@ async function syncAccount(
           campaigns: sql`excluded.campaigns`, raw: sql`excluded.raw`, syncedAt: sql`excluded.synced_at`,
         },
       });
-    log(`✓ ${slug} ${month} (${combos.length} combinaciones)`);
+    const nCampaigns = await syncCampaigns(s, slug, month, from, to, restricted);
+    log(`✓ ${slug} ${month} (${combos.length} combinaciones, ${nCampaigns} campañas)`);
   }
+}
+
+/** Reemplaza las campañas del mes de una cuenta con lo que devuelve list_campaigns (paginado). */
+async function syncCampaigns(
+  s: WoowUpSession, slug: string, month: string, from: string, to: string, restricted: boolean,
+): Promise<number> {
+  const all = [];
+  for (let page = 1; page <= 30; page++) {
+    const { items, hasMore } = parseCampaignList(await s.call(TOOLS.listCampaigns, listCampaignsArgs({ from, to, page })), {
+      revenueRestricted: restricted,
+    });
+    all.push(...items);
+    if (hasMore === false || (hasMore === null && items.length < CAMPAIGNS_PAGE_SIZE) || items.length === 0) break;
+  }
+  // dedupe por id (por si la paginación repite)
+  const unique = [...new Map(all.map((c) => [c.campaignId, c])).values()];
+  const d = db();
+  const t = schema.campaignMetrics;
+  await d.delete(t).where(and(eq(t.accountSlug, slug), eq(t.month, month)));
+  for (let i = 0; i < unique.length; i += 200) {
+    await d.insert(t).values(
+      unique.slice(i, i + 200).map(({ campaigns: _c, raw, ...c }) => ({
+        ...c, accountSlug: slug, month, raw: raw as object, syncedAt: new Date(),
+      })),
+    );
+  }
+  return unique.length;
 }

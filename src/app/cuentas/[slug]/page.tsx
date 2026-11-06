@@ -1,15 +1,18 @@
 import { notFound } from "next/navigation";
-import { getGroups, getAccounts, getMetrics } from "@/lib/data";
+import { getAccounts, getGroups, getMetrics } from "@/lib/data";
 import { FiltersBar } from "@/components/FiltersBar";
 import { KpiCards } from "@/components/KpiCards";
 import { MonthlyTable } from "@/components/MonthlyTable";
 import { TrendChart } from "@/components/Charts";
 import { Badge, PageHeader } from "@/components/PageHeader";
+import { CampaignHighlights } from "@/components/CampaignHighlights";
+import { CampaignsTable } from "@/components/CampaignsTable";
 import {
-  CHANNEL_LABEL, GROUP_TYPE_LABEL, fmtInt, fmtMoney, fmtPct, kpis, sumCounts, type Channel, type GroupType,
+  CHANNEL_LABEL, GROUP_TYPE_LABEL, fmtInt, fmtMoney, fmtPct, kpis, sumCounts, type Channel, type Counts, type GroupType,
 } from "@/lib/metrics";
-import { addMonths, monthLabel } from "@/lib/months";
-import { buildSeries, parseFilters } from "@/lib/views";
+import { monthLabel } from "@/lib/months";
+import { buildMonthView, filtersQs, monthTitle, parseFilters } from "@/lib/views";
+import { campaignItems } from "@/lib/campaign-view";
 
 export const dynamic = "force-dynamic";
 
@@ -25,28 +28,26 @@ export default async function AccountPage({
   const account = accounts.find((a) => a.slug === slug);
   if (!account) notFound();
   const group = groups.find((g) => g.slug === account.groupSlug);
-  const qs = new URLSearchParams({ from: f.from, to: f.to, channel: f.channel, type: f.groupType }).toString();
-
-  const s = await buildSeries([account], f);
+  const qs = filtersQs(f);
   const restricted = account.role === "CONSULT" || account.role === "OPERATOR";
 
-  // Mix del rango: por canal (respetando el tipo elegido) y por tipo (respetando el canal elegido)
-  const base = { accountSlugs: [slug], from: f.from, to: f.to };
-  const byChannel = await Promise.all(
-    (["all", ...account.channels] as Channel[]).map(async (ch) => ({
-      key: ch, label: CHANNEL_LABEL[ch] ?? ch, c: sumCounts(await getMetrics({ ...base, channel: ch, groupType: f.groupType })),
-    })),
-  );
-  const byType = await Promise.all(
-    (["custom", "triggered"] as GroupType[]).map(async (gt) => ({
-      key: gt, label: GROUP_TYPE_LABEL[gt], c: sumCounts(await getMetrics({ ...base, channel: f.channel, groupType: gt })),
-    })),
-  );
-  const prevLabel = `${monthLabel(addMonths(f.from, -s.months.length), true)} – ${monthLabel(addMonths(f.from, -1), true)} (período anterior)`;
-  const customCampaigns = byType.find((t) => t.key === "custom")?.c.campaigns ?? 0;
-  const weeks = Math.max(1, s.months.length * 4.345);
+  const base = { accountSlugs: [slug], from: f.month, to: f.month };
+  const [v, campaigns, byChannel, byType] = await Promise.all([
+    buildMonthView([account], f),
+    campaignItems([account], f.month, qs),
+    Promise.all(
+      (["all", ...account.channels] as Channel[]).map(async (ch) => ({
+        key: ch, label: CHANNEL_LABEL[ch] ?? ch, c: sumCounts(await getMetrics({ ...base, channel: ch, groupType: f.groupType })),
+      })),
+    ),
+    Promise.all(
+      (["custom", "triggered"] as GroupType[]).map(async (gt) => ({
+        key: gt, label: GROUP_TYPE_LABEL[gt], c: sumCounts(await getMetrics({ ...base, channel: f.channel, groupType: gt })),
+      })),
+    ),
+  ]);
 
-  const MixTable = ({ title, rows, totalSent }: { title: string; rows: { key: string; label: string; c: ReturnType<typeof sumCounts> }[]; totalSent: number }) => (
+  const MixTable = ({ title, rows, totalSent }: { title: string; rows: { key: string; label: string; c: Counts }[]; totalSent: number }) => (
     <div className="card overflow-x-auto">
       <div className="px-4 pt-3 pb-2 h-display text-sm">{title}</div>
       <table className="tbl w-full">
@@ -90,7 +91,7 @@ export default async function AccountPage({
           { label: account.name },
         ]}
         title={account.name}
-        subtitle={`${group ? `Marca de ${group.name}` : "Cuenta"} · ${monthLabel(f.from)} ${f.from.slice(0, 4)} → ${monthLabel(f.to)} ${f.to.slice(0, 4)} · ${CHANNEL_LABEL[f.channel]} · ${GROUP_TYPE_LABEL[f.groupType]}`}
+        subtitle={`${group ? `Marca de ${group.name}` : "Cuenta"} · ${monthTitle(f.month)}${v.partial ? " (en curso)" : ""} · ${CHANNEL_LABEL[f.channel]} · ${GROUP_TYPE_LABEL[f.groupType]}`}
         badges={
           <>
             {account.country && <Badge tone="slate">{account.country}</Badge>}
@@ -107,28 +108,31 @@ export default async function AccountPage({
         </div>
       )}
       <FiltersBar f={f} channels={account.channels} />
-      <KpiCards total={s.total} prev={s.prevTotal} currency={account.currency} showLights={f.channel === "email"} prevLabel={prevLabel} />
+      <KpiCards current={v.current} prev={v.prev} yoy={v.yoy} currency={account.currency} showLights={f.channel === "email"} partial={v.partial} />
 
-      <TrendChart
-        showRevenue={!restricted && s.total.revenue != null}
-        data={s.series.map((p) => ({ label: monthLabel(p.month), sent: p.sent, revenue: p.revenue, ctr: p.k.ctr == null ? null : p.k.ctr * 100 }))}
-      />
+      <section className="space-y-3">
+        <h2 className="h-display text-lg">Campañas de {monthTitle(f.month)}</h2>
+        <CampaignHighlights items={campaigns} byRevenue={!restricted && v.current.revenue != null} monthName={monthTitle(f.month)} />
+        <CampaignsTable items={campaigns} showBrand={false} showRevenue initialChannel={f.channel} initialType={f.groupType} />
+      </section>
 
       <div className="grid lg:grid-cols-2 gap-4">
         <MixTable title={`Por canal · ${GROUP_TYPE_LABEL[f.groupType]}`} rows={byChannel} totalSent={byChannel[0]?.c.sent ?? 0} />
-        <div className="space-y-2">
-          <MixTable title={`One-shot vs automatizaciones · ${CHANNEL_LABEL[f.channel]}`} rows={byType} totalSent={byType.reduce((t, r) => t + r.c.sent, 0)} />
-          <p className="text-xs text-pd-slate px-1">
-            Frecuencia one-shot: <span className="num font-semibold text-pd-navy">{(customCampaigns / weeks).toFixed(1)}</span> campañas por semana en el rango
-            ({fmtInt(customCampaigns)} campañas / {weeks.toFixed(0)} semanas).
-          </p>
-        </div>
+        <MixTable title={`One-shot vs automatizaciones · ${CHANNEL_LABEL[f.channel]}`} rows={byType} totalSent={byType.reduce((t, r) => t + r.c.sent, 0)} />
       </div>
 
-      <section className="space-y-2">
-        <h2 className="h-display text-lg">Mes a mes</h2>
-        <MonthlyTable series={s.series} currency={account.currency} />
-      </section>
+      <TrendChart
+        highlight={monthLabel(f.month)}
+        showRevenue={!restricted && v.current.revenue != null}
+        data={v.history.map((p) => ({ label: monthLabel(p.month), sent: p.sent, revenue: p.revenue, ctr: p.k.ctr == null ? null : p.k.ctr * 100 }))}
+      />
+
+      <details>
+        <summary className="cursor-pointer select-none h-display text-sm text-pd-blue hover:underline">
+          Ver tabla histórica de los últimos 12 meses
+        </summary>
+        <div className="mt-3"><MonthlyTable series={v.history} currency={account.currency} /></div>
+      </details>
     </div>
   );
 }

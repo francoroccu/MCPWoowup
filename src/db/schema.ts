@@ -74,3 +74,38 @@ export const syncRuns = pgTable("sync_runs", {
   accountsFailed: integer("accounts_failed").default(0).notNull(),
   errors: jsonb("errors").$type<{ account: string; message: string }[]>().default([]).notNull(),
 });
+
+/**
+ * Métricas por campaña y mes (list_campaigns con with_stats, filter_by=activity).
+ * Las automatizaciones aparecen todos los meses con el mismo campaign_id → historial.
+ */
+export const campaignMetrics = pgTable(
+  "campaign_metrics",
+  {
+    accountSlug: text("account_slug")
+      .notNull()
+      .references(() => accounts.slug, { onDelete: "cascade" }),
+    month: text("month").notNull(), // YYYY-MM
+    campaignId: text("campaign_id").notNull(),
+    name: text("name").notNull(),
+    channel: text("channel").notNull(), // email | sms | whatsapp | push
+    groupType: text("group_type").notNull(), // custom | triggered
+    campaignType: text("campaign_type"), // newsletter, abandoned_cart, ...
+    status: text("status"),
+    sentAt: text("sent_at"), // YYYY-MM-DD (one-shot)
+    subject: text("subject"),
+    sent: integer("sent").default(0).notNull(),
+    delivered: integer("delivered").default(0).notNull(),
+    bounces: integer("bounces").default(0).notNull(),
+    opens: integer("opens").default(0).notNull(),
+    clicks: integer("clicks").default(0).notNull(),
+    spam: integer("spam").default(0).notNull(),
+    unsubscribes: integer("unsubscribes").default(0).notNull(),
+    conversions: integer("conversions").default(0).notNull(),
+    revenue: doublePrecision("revenue"),
+    revenueRedacted: boolean("revenue_redacted").default(false).notNull(),
+    raw: jsonb("raw"),
+    syncedAt: timestamp("synced_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.accountSlug, t.month, t.campaignId] })],
+);

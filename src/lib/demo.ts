@@ -2,7 +2,7 @@
  * Datos DEMO para ver la plataforma sin base de datos ni MCP.
  * Los números son ficticios y deterministas (misma semilla → mismos datos).
  */
-import type { Account, Group } from "./types";
+import type { Account, CampaignRow, Group } from "./types";
 import type { Channel, GroupType, MetricRow } from "./metrics";
 import { currentMonth, monthRange } from "./months";
 
@@ -112,4 +112,107 @@ export function demoRows(): MetricRow[] {
     }
   }
   return rows;
+}
+
+// ── Campañas demo ────────────────────────────────────────────────────
+// Se reparten los totales mensuales de cada canal × tipo entre campañas,
+// así la suma de campañas coincide con los totales de la cuenta.
+
+const SEASONAL: Record<number, string[]> = {
+  1: ["Liquidación de verano", "Rebajas enero"],
+  2: ["Vuelta a clases", "San Valentín"],
+  3: ["Vuelta a clases", "Nueva temporada otoño"],
+  4: ["Semana Santa", "Lanzamiento otoño-invierno"],
+  5: ["Día de la Madre", "Hot Sale"],
+  6: ["CyberDay", "Día del Padre"],
+  7: ["Vacaciones de invierno", "Liquidación invierno"],
+  8: ["Día del Niño", "Mid Season Sale"],
+  9: ["Fiestas Patrias", "Primavera"],
+  10: ["CyberDay", "Halloween"],
+  11: ["Black Friday", "Cyber Monday"],
+  12: ["Navidad", "Último día de despacho"],
+};
+const GENERIC = ["Newsletter semanal", "Lanzamiento colección", "Recordatorio puntos Club", "Outlet", "Nuevos ingresos", "Envío gratis 48 h", "Top ventas", "Exclusivo app"];
+const AUTOMATIONS: { name: string; type: string; channels: string[] }[] = [
+  { name: "Carrito abandonado", type: "abandoned_cart", channels: ["email", "whatsapp", "sms"] },
+  { name: "Bienvenida", type: "welcome", channels: ["email"] },
+  { name: "Producto visitado", type: "browse_abandonment", channels: ["email", "push"] },
+  { name: "Post-compra · cross-sell", type: "post_purchase", channels: ["email", "whatsapp"] },
+  { name: "Cumpleaños", type: "birthday", channels: ["email", "sms"] },
+  { name: "Reactivación 90 días", type: "winback", channels: ["email", "sms"] },
+  { name: "Recompra", type: "replenishment", channels: ["email"] },
+];
+const CH_NAME: Record<string, string> = { email: "Email", sms: "SMS", whatsapp: "WhatsApp", push: "Push" };
+const slugify = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
+const COUNT_KEYS = ["sent", "delivered", "bounces", "opens", "clicks", "spam", "unsubscribes", "conversions"] as const;
+
+/** Reparte `total` según pesos; el último absorbe el redondeo. */
+function split(total: number, weights: number[]): number[] {
+  const sum = weights.reduce((a, b) => a + b, 0) || 1;
+  const out = weights.map((w) => Math.floor((total * w) / sum));
+  out[out.length - 1] += total - out.reduce((a, b) => a + b, 0);
+  return out;
+}
+
+let _campCache: CampaignRow[] | null = null;
+export function demoCampaigns(): CampaignRow[] {
+  if (_campCache) return _campCache;
+  const base = demoRows().filter((r) => r.channel !== "all" && r.groupType !== "all");
+  const out: CampaignRow[] = [];
+  const today = new Date();
+  for (const row of base) {
+    const r = rng(hash(`${row.accountSlug}|${row.month}|${row.channel}|${row.groupType}`));
+    const m = Number(row.month.slice(5));
+    const [y] = row.month.split("-").map(Number);
+    const lastDay = row.month === currentMonth() ? Math.max(1, today.getDate()) : new Date(y, m, 0).getDate();
+    let defs: { id: string; name: string; type: string; sentAt: string | null }[];
+    if (row.groupType === "triggered") {
+      defs = AUTOMATIONS.filter((a) => a.channels.includes(row.channel)).map((a) => ({
+        id: `${row.accountSlug}-auto-${row.channel}-${a.type}`, name: `${a.name} · ${CH_NAME[row.channel]}`, type: a.type, sentAt: null,
+      }));
+      if (defs.length === 0) continue;
+    } else {
+      const n = Math.max(1, Math.min(row.campaigns, 12));
+      const pool = [...SEASONAL[m], ...GENERIC];
+      defs = Array.from({ length: n }, (_, i) => {
+        const day = Math.min(lastDay, 1 + Math.floor(((i + r()) / n) * lastDay));
+        const name = i < 2 ? SEASONAL[m][i] : pool[2 + ((i + Math.floor(r() * 5)) % (pool.length - 2))];
+        return {
+          id: `${row.accountSlug}-${row.month}-${row.channel}-${i + 1}`,
+          name: `${name}${i >= 2 ? ` #${i - 1}` : ""}`,
+          type: i < 2 ? "promotional" : "newsletter",
+          sentAt: `${row.month}-${String(day).padStart(2, "0")}`,
+        };
+      });
+    }
+    // pesos: volumen base y "rendimiento" distinto por campaña
+    const wSent = defs.map((_, i) => (row.groupType === "custom" && i < 2 ? 1.8 : 0.4) + r());
+    const perf = defs.map(() => 0.45 + r() * 1.4);
+    const perfRev = perf.map((p) => p * (0.6 + r() * 0.9));
+    const parts: Record<string, number[]> = {};
+    for (const k of COUNT_KEYS) {
+      const w = k === "clicks" || k === "opens" ? wSent.map((w, i) => w * (k === "clicks" ? perf[i] : Math.sqrt(perf[i])))
+        : k === "conversions" ? wSent.map((w, i) => w * perfRev[i])
+        : wSent;
+      parts[k] = split(row[k], w);
+    }
+    const rev = row.revenue == null ? null : split(Math.round(row.revenue), wSent.map((w, i) => w * perfRev[i]));
+    defs.forEach((d, i) => {
+      const c: CampaignRow = {
+        accountSlug: row.accountSlug, month: row.month, campaignId: d.id, name: d.name, channel: row.channel,
+        groupType: row.groupType as "custom" | "triggered", campaignType: d.type,
+        status: row.groupType === "triggered" ? "active" : "sent", sentAt: d.sentAt,
+        subject: row.channel === "email" ? `${d.name} 🛍️` : null,
+        sent: 0, delivered: 0, bounces: 0, opens: 0, clicks: 0, spam: 0, unsubscribes: 0, conversions: 0,
+        revenue: rev ? rev[i] : null, revenueRedacted: row.revenueRedacted, campaigns: 1,
+      };
+      for (const k of COUNT_KEYS) c[k] = parts[k][i];
+      c.delivered = Math.min(c.delivered, c.sent);
+      c.opens = Math.min(c.opens, Math.round(c.delivered * 0.95));
+      if (c.channel !== "sms") c.clicks = Math.min(c.clicks, c.opens);
+      out.push(c);
+    });
+  }
+  return (_campCache = out);
 }
