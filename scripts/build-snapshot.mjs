@@ -97,7 +97,7 @@ for (const c of campaigns) {
   if (a) a.campaigns++;
 }
 
-const SCOPE = `${accounts.length} cuentas (todas las de WoowUp) · métricas ene–nov 2026 (nov parcial al 12/11) · detalle de campañas: octubre 2026 en todas las marcas (top 12 por revenue)`;
+const SCOPE = `${accounts.length} cuentas (todas las de WoowUp) · métricas ene–nov 2026 (nov parcial al 13/11) · detalle de campañas: octubre 2026 en todas las marcas (top 12 por revenue)`;
 const snapshot = {
   generatedAt: new Date().toISOString(),
   source: "MCP de WoowUp (get_campaigns_stats y list_campaigns, filter_by=activity)",
